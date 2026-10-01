@@ -3,6 +3,7 @@ import { Bell, ChevronsLeft, ChevronsRight, LogOut, Menu, Moon, Search, Settings
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { NAV_GROUPS } from '../../constants/navigation'
 import { useAuth } from '../../context/AuthContext'
+import { markLeft } from '../../data/session'
 import { useTheme } from '../../context/ThemeContext'
 import IconButton from '../common/IconButton'
 import { useOutsideClose } from '../ui'
@@ -15,7 +16,7 @@ const notifications = [
 ]
 
 export default function AppLayout() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const { dark, toggle } = useTheme()
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -28,7 +29,7 @@ export default function AppLayout() {
   const menuRef = useOutsideClose(() => setMenu(false))
   useEffect(() => setOpen(false), [pathname])
   const isActive = (p?: string) => !!p && (p === '/' ? pathname === '/' : pathname.startsWith(p))
-  const signOut = () => { logout(); navigate('/login') }
+  const toWelcome = () => { markLeft(); navigate('/login') }
 
   return (
     <div className={styles.shell}>
@@ -56,7 +57,7 @@ export default function AppLayout() {
         <div className={styles.userCard}>
           <span className="avatar" style={{ width: 34, height: 34, fontSize: 12 }}>{user?.initials}</span>
           <span className={styles.userMeta}><b>{user?.name}</b><small>{user?.role}</small></span>
-          <IconButton small className={styles.signout} onClick={signOut} aria-label="Sign out" title="Sign out"><LogOut size={16} /></IconButton>
+          <IconButton small className={styles.signout} onClick={toWelcome} aria-label="Welcome screen" title="Welcome screen"><LogOut size={16} /></IconButton>
         </div>
       </aside>
       {open && <div className={styles.scrim} onClick={() => setOpen(false)} />}
@@ -91,7 +92,7 @@ export default function AppLayout() {
                 <button onClick={() => setMenu(false)}><UserRound size={16} /> Profile</button>
                 <button onClick={() => setMenu(false)}><Settings size={16} /> Settings</button>
                 <div className="menu-sep" />
-                <button className="danger" onClick={signOut}><LogOut size={16} /> Sign out</button>
+                <button onClick={toWelcome}><LogOut size={16} /> Welcome screen</button>
               </div>
             )}
           </div>

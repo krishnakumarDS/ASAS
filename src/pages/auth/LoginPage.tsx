@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { ArrowRight, Moon, Sparkles, Sun, Zap, Network, Gauge } from 'lucide-react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import AppButton from '../../components/common/AppButton'
 import IconButton from '../../components/common/IconButton'
 import { useAuth } from '../../context/AuthContext'
+import { markEntered } from '../../data/session'
 import { useTheme } from '../../context/ThemeContext'
 import styles from './LoginPage.module.css'
 
@@ -14,16 +14,13 @@ const features = [
 ]
 
 export default function LoginPage() {
-  const { user, login } = useAuth()
+  const { user, loading, error } = useAuth()
   const { dark, toggle } = useTheme()
   const navigate = useNavigate()
   const from = (useLocation().state as { from?: string } | null)?.from ?? '/'
-  const [busy, setBusy] = useState(false)
-  if (user) return <Navigate to="/" replace />
 
-  const start = async () => {
-    setBusy(true)
-    await login()
+  const start = () => {
+    markEntered()
     navigate(from, { replace: true })
   }
 
@@ -45,9 +42,10 @@ export default function LoginPage() {
 
       <section className={styles.formSide}>
         <div className={`card ${styles.card}`}>
-          <h2>Welcome</h2>
+          <h2>{user ? `Welcome, ${user.name.split(' ')[0]}` : 'Welcome'}</h2>
           <p className={styles.sub}>Welcome to the ASAS Search Engine Portal. Search and manage major project data, track submissions and KPIs, and generate reports — all in one place.</p>
-          <AppButton variant="contained" size="large" fullWidth loading={busy} onClick={start} endIcon={!busy ? <ArrowRight size={18} /> : undefined} autoFocus>Get Started</AppButton>
+          {error && <p className="error-text" role="alert" style={{ marginBottom: 16 }}>{error}</p>}
+          <AppButton variant="contained" size="large" fullWidth loading={loading} disabled={!user} onClick={start} endIcon={!loading ? <ArrowRight size={18} /> : undefined} autoFocus>Get Started</AppButton>
         </div>
       </section>
     </div>

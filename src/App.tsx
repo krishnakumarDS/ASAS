@@ -1,7 +1,8 @@
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import AppLayout from './components/layout/AppLayout'
 import { useAuth } from './context/AuthContext'
+import { hasEnteredThisLoad } from './data/session'
 import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import PartiesListPage from './pages/PartiesListPage'
@@ -18,16 +19,20 @@ import SubstationFormPage from './pages/SubstationFormPage'
 import SubstationsPage from './pages/SubstationsPage'
 import EmptyState from './components/common/EmptyState'
 
+/** Identity comes from the Power Platform host (see AuthContext): gate rendering until it
+ * resolves, or show why it didn't. Every fresh load must also pass the welcome screen. */
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
+  const { user, loading, error } = useAuth()
   const loc = useLocation()
-  return user ? <>{children}</> : <Navigate to="/login" replace state={{ from: loc.pathname + loc.search }} />
+  if (loading) return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}><span className="spinner" style={{ width: 28, height: 28, color: 'var(--accent-600)' }} aria-label="Loading" /></div>
+  if (!user) return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16 }}><EmptyState title="Unable to determine the signed-in user" description={error ?? 'Open this app through the Power Platform player.'} /></div>
+  if (!hasEnteredThisLoad()) return <Navigate to="/login" replace state={{ from: loc.pathname + loc.search }} />
+  return <>{children}</>
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
           <Route index element={<DashboardPage />} />
@@ -50,6 +55,5 @@ export default function App() {
           <Route path="*" element={<EmptyState title="Page not found" description="The page you’re looking for doesn’t exist." />} />
         </Route>
       </Routes>
-    </BrowserRouter>
   )
 }
