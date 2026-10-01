@@ -1,0 +1,19 @@
+@keyframes pageReveal { from { opacity: 0; transform: translateY(10px) scale(0.995); filter: blur(1px); } to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes formReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { 0%, 100% { background-position: -1000px 0; } 50% { background-position: 1000px 0; } }
+@keyframes shimmerSwipe { from { background-position: -120% 0; } to { background-position: 220% 0; } }
+@keyframes heroFloat { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-14px, -14px) scale(1.05); } }
+@keyframes pulseDot { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 70%, transparent); } 70% { box-shadow: 0 0 0 10px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes navIndicatorIn { from { transform: scaleY(0.2); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+
+.reveal { animation: pageReveal 0.4s var(--transition-base) both; }
+.reveal-item { animation: formReveal 0.3s var(--transition-base) both; animation-delay: calc(0.05s * var(--index, 0)); }
+.skeleton { background: linear-gradient(90deg, var(--bg-tertiary), color-mix(in srgb, var(--bg-tertiary) 70%, var(--accent-600)), var(--bg-tertiary)); background-size: 200% 100%; animation: shimmer 1.8s infinite; border-radius: var(--radius-md); }
+.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); animation: pulseDot 1.8s ease-out infinite; display: inline-block; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

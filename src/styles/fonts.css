@@ -1,0 +1,9 @@
+/* Dubai font — drop licensed files into public/fonts/. local() is tried first. */
+@font-face { font-family: 'Dubai'; font-weight: 300; font-style: normal; font-display: swap;
+  src: local('Dubai Light'), local('Dubai-Light'), url('/fonts/Dubai-Light.woff2') format('woff2'); }
+@font-face { font-family: 'Dubai'; font-weight: 400; font-style: normal; font-display: swap;
+  src: local('Dubai Regular'), local('Dubai-Regular'), local('Dubai'), url('/fonts/Dubai-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'Dubai'; font-weight: 500; font-style: normal; font-display: swap;
+  src: local('Dubai Medium'), local('Dubai-Medium'), url('/fonts/Dubai-Medium.woff2') format('woff2'); }
+@font-face { font-family: 'Dubai'; font-weight: 700; font-style: normal; font-display: swap;
+  src: local('Dubai Bold'), local('Dubai-Bold'), url('/fonts/Dubai-Bold.woff2') format('woff2'); }

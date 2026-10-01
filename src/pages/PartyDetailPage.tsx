@@ -1,0 +1,171 @@
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { ImageIcon, Pencil, Plus, Save, Search, Upload, X } from 'lucide-react'
+import AppButton from '../components/common/AppButton'
+import Section from '../components/common/Section'
+import PageHeader from '../components/PageHeader'
+import StatusChip from '../components/common/StatusChip'
+import { ActionsMenu, DataTable, Modal, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
+import { fmtDate } from '../data/mock'
+import { consultantByProject, projects } from '../data/projects'
+import { kindMeta } from './PartiesListPage'
+import type { Kind } from './PartiesListPage'
+
+interface Issue { id: string; ref: string; project: string; description: string; createdBy: string; createdOn: string; showInSO: boolean }
+
+export default function PartyDetailPage({ kind }: { kind: Kind }) {
+  const m = kindMeta[kind]
+  const other = kind === 'consultant' ? 'Developers' : 'Consultants'
+  const { id = 'new' } = useParams()
+  const navigate = useNavigate()
+  const party = m.data.find((p) => p.id === id)
+  const isNew = !party
+  const [edit, setEdit] = useState(isNew)
+  const [name, setName] = useState(party?.name ?? '')
+  const [url, setUrl] = useState(party?.url ?? '')
+  const [show, setShow] = useState(party ? (party.showInSO ? 'Yes' : 'No') : '')
+  const [image, setImage] = useState<File | null>(null)
+  const [tab, setTab] = useState('Main details')
+  const [submitted, setSubmitted] = useState(false)
+  const [issues, setIssues] = useState<Issue[]>([])
+  const [issueModal, setIssueModal] = useState(false)
+  const [fRef, setFRef] = useState('')
+  const [fName, setFName] = useState('')
+  const [fBy, setFBy] = useState('')
+  const [toast, say] = useToast()
+
+  const related = projects.filter((p) => (kind === 'consultant' ? consultantByProject[p.id] === name : p.developer.split(' (')[0] === name.split(' (')[0] || p.developer === name))
+  const others = [...new Set(related.map((p) => (kind === 'consultant' ? p.developer : consultantByProject[p.id])).filter(Boolean))]
+  const tabs = isNew ? ['Main details'] : edit ? ['Main details', 'Issues'] : ['Main details', 'Issues', 'Projects', other]
+  const match = (a: string, b: string) => a.toLowerCase().includes(b.toLowerCase())
+  const save = () => { setSubmitted(true); if (!name.trim()) return; say(`${m.one} saved`); setTimeout(() => (isNew ? navigate(m.path) : setEdit(false)), 800) }
+  const initials = name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
+
+  return (
+    <div className="page">
+      <PageHeader title={isNew ? `New ${m.one.toLowerCase()}` : name} subtitle={isNew ? undefined : `${m.one} · created ${fmtDate(party?.createdOn ?? '')}`} actions={
+        <>
+          <AppButton variant="outlined" startIcon={<X size={16} />} onClick={() => navigate(m.path)}>Close</AppButton>
+          {edit ? <AppButton variant="contained" startIcon={<Save size={16} />} onClick={save}>Save</AppButton>
+            : <AppButton variant="contained" startIcon={<Pencil size={16} />} onClick={() => setEdit(true)}>Edit</AppButton>}
+        </>
+      } />
+
+      {!isNew && (
+        <section className="card hero gap-section reveal">
+          <div className="row wrap" style={{ gap: 20, position: 'relative' }}>
+            <span className="avatar lg">{initials}</span>
+            <div className="grow">
+              <h3 style={{ fontSize: 22 }}>{name}</h3>
+              <div className="row wrap" style={{ marginTop: 8 }}>
+                <StatusChip status={show === 'Yes' ? 'active' : 'hidden'} label={show === 'Yes' ? 'Shown in Smart Office' : 'Hidden in Smart Office'} />
+                {url && <a className="link" href={url} target="_blank" rel="noreferrer">{url}</a>}
+              </div>
+            </div>
+            <div className="stats" style={{ minWidth: 280 }}>
+              <div className="stat"><small>Projects</small><strong>{related.length}</strong></div>
+              <div className="stat"><small>{other}</small><strong>{others.length}</strong></div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <Tabs tabs={tabs} active={tab} onChange={setTab} />
+
+        {tab === 'Main details' && (
+          <div className="card-body" style={{ maxWidth: 900 }}>
+            <Section title="Profile">
+              <div className="row wrap" style={{ gap: 24, alignItems: 'flex-start' }}>
+                <div style={{ width: 140 }}>
+                  <div className="avatar lg" style={{ width: 140, height: 120, borderStyle: 'dashed', borderRadius: 'var(--radius-lg)' }}>{image ? <span style={{ fontSize: 12, padding: 8, textAlign: 'center' }}>{image.name}</span> : <span className="muted" style={{ textAlign: 'center', fontSize: 12 }}><ImageIcon size={26} /><br />No image</span>}</div>
+                  {edit && <AppButton component="label" variant="outlined" fullWidth size="small" startIcon={<Upload size={14} />} style={{ marginTop: 10 }}>Upload<input type="file" accept="image/*" hidden onChange={(e) => setImage(e.target.files?.[0] ?? null)} /></AppButton>}
+                </div>
+                <div className="grow" style={{ minWidth: 260 }}>
+                  <TextField label="Name" required value={name} readOnly={!edit} onChange={setName} error={submitted && !name.trim() ? 'This field is required' : undefined} />
+                  <TextField label="URL" value={url} readOnly={!edit} onChange={setUrl} placeholder="https://" />
+                  <RadioField label="Show in Smart Office?" value={show} disabled={!edit} onChange={setShow} />
+                </div>
+              </div>
+            </Section>
+          </div>
+        )}
+
+        {tab === 'Issues' && (
+          <div>
+            <div className="row between wrap" style={{ gap: 12, padding: '14px 20px' }}>
+              <div className="row wrap">
+                <input className="input" style={{ width: 160 }} placeholder="Maalem ref#" aria-label="Maalem ref" value={fRef} onChange={(e) => setFRef(e.target.value)} />
+                <input className="input" style={{ width: 200 }} placeholder="Project name" aria-label="Project name" value={fName} onChange={(e) => setFName(e.target.value)} />
+                <input className="input" style={{ width: 160 }} placeholder="Created by" aria-label="Created by" value={fBy} onChange={(e) => setFBy(e.target.value)} />
+                <AppButton variant="outlined" startIcon={<Search size={15} />}>Search</AppButton>
+              </div>
+              {edit && <AppButton variant="contained" startIcon={<Plus size={15} />} onClick={() => setIssueModal(true)}>Add issue</AppButton>}
+            </div>
+            <DataTable<Issue>
+              rows={issues.filter((i) => match(i.ref, fRef) && match(i.project, fName) && match(i.createdBy, fBy))} empty="No issues recorded."
+              columns={[
+                { header: 'Project', render: (r) => <><strong>{r.project}</strong><div className="cell-sub num">{r.ref}</div></> },
+                { header: 'Description', render: (r) => r.description },
+                { header: 'Created', render: (r) => <><div>{r.createdBy}</div><div className="cell-sub">{fmtDate(r.createdOn)}</div></> },
+                { header: 'Smart Office', render: (r) => <StatusChip status={r.showInSO ? 'visible' : 'hidden'} /> },
+                { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Delete', danger: true, onClick: () => setIssues(issues.filter((x) => x.id !== r.id)) }]} /> },
+              ]}
+            />
+          </div>
+        )}
+
+        {tab === 'Projects' && (
+          <div>
+            <div className="card-body"><div className="stats">
+              <div className="stat"><small>Total plots</small><strong>{related.length * 11}</strong></div>
+              <div className="stat"><small>Total TCL (MW)</small><strong>{(related.length * 612.4).toLocaleString('en', { maximumFractionDigits: 2 })}</strong></div>
+              <div className="stat"><small>Total DCP (MW)</small><strong>{(related.length * 20).toFixed(2)}</strong></div>
+            </div></div>
+            <DataTable
+              rows={related} empty="No linked projects."
+              columns={[
+                { header: 'Project', render: (r) => <><a href="#" className="link cell-title" onClick={(e) => { e.preventDefault(); navigate(`/projects/${r.id}`) }}>{r.name}</a><div className="cell-sub num">{r.maalemRef}</div></> },
+                { header: kind === 'consultant' ? 'Developer' : 'Consultant', render: (r) => (kind === 'consultant' ? r.developer : consultantByProject[r.id]) || '—' },
+                { header: 'Created', render: (r) => <><div>{r.createdBy}</div><div className="cell-sub">{fmtDate(r.createdOn)}</div></> },
+                { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Open project', onClick: () => navigate(`/projects/${r.id}`) }]} /> },
+              ]}
+            />
+          </div>
+        )}
+
+        {tab === other && (
+          <DataTable<{ id: string; name: string }>
+            rows={others.map((n) => ({ id: n, name: n }))} empty={`No linked ${other.toLowerCase()}.`}
+            columns={[
+              { header: `${other.slice(0, -1)}`, render: (r) => <strong>{r.name}</strong> },
+              { header: 'Created by', render: () => <span className="muted">Mariam Mohamed Alhosani</span> },
+              { header: 'Smart Office', render: () => <StatusChip status="visible" label="true" /> },
+            ]}
+          />
+        )}
+      </div>
+
+      {issueModal && <IssueModal refs={related.map((p) => p.maalemRef)} onClose={() => setIssueModal(false)} onSave={(i) => { const p = projects.find((x) => x.maalemRef === i.ref); setIssues((prev) => [...prev, { ...i, project: p?.name ?? '' }]); setIssueModal(false); say('Issue added') }} />}
+      {toast}
+    </div>
+  )
+}
+
+function IssueModal({ refs, onClose, onSave }: { refs: string[]; onClose: () => void; onSave: (i: Issue) => void }) {
+  const [ref, setRef] = useState('')
+  const [desc, setDesc] = useState('')
+  const [show, setShow] = useState('')
+  return (
+    <Modal title="Add issue" size="sm" onClose={onClose} footer={
+      <>
+        <AppButton variant="outlined" onClick={onClose}>Cancel</AppButton>
+        <AppButton variant="contained" disabled={!desc.trim() || !show} onClick={() => onSave({ id: String(Date.now()), ref, project: '', description: desc, createdBy: 'venkat reddy', createdOn: new Date().toISOString(), showInSO: show === 'Yes' })}>Save</AppButton>
+      </>
+    }>
+      <SelectField label="Maalem Dubai ref" value={ref} options={refs} onChange={setRef} />
+      <TextField label="Description" required multiline placeholder="Please explain the issue details…" value={desc} onChange={setDesc} />
+      <RadioField label="Show in Smart Office?" required value={show} onChange={setShow} />
+    </Modal>
+  )
+}

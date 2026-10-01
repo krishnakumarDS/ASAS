@@ -1,0 +1,200 @@
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Ban, FolderOpen, Plus, Power, Save, X } from 'lucide-react'
+import AppButton from '../components/common/AppButton'
+import Section from '../components/common/Section'
+import StatusChip from '../components/common/StatusChip'
+import PageHeader from '../components/PageHeader'
+import { ActionsMenu, DataTable, LookupModal, Modal, PickField, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
+import { consultants, developers, fmtDate, substations } from '../data/mock'
+import { consultantByProject, projects } from '../data/projects'
+import type { Project } from '../data/projects'
+
+type Values = Record<string, string>
+const emptyValues: Values = {
+  ref: '', maalemNumber: '', maalemRef: '', name: '', areaMap: '', areaMapRef: '', areaReport: '', zone: '', subZone: '',
+  built: '0', underConstruction: '0', vacant: '0', engineer: '', assistantEngineer: '', developer: '', consultant: '', masterPlanStatus: '', siteSurveyor: '',
+  corridors: '', ducts: '', hvNoc: '', ss132: '0', ss400: '0', category: '',
+}
+const detailsFor = (p: Project): Values => {
+  const [a, b, c] = p.maalemRef.split('-')
+  return { ...emptyValues, ref: c, maalemNumber: `${a}-${b}`, maalemRef: p.maalemRef, name: p.name, areaMap: 'Yes', areaMapRef: `17-${p.maalemRef}-${p.name.toUpperCase().slice(0, 8)}`, areaReport: 'Full', subZone: 'B_E',
+    engineer: 'LBN', assistantEngineer: 'SRN', developer: p.developer, consultant: consultantByProject[p.id] ?? '', masterPlanStatus: 'Approved', siteSurveyor: 'Yes', corridors: 'Approved', ducts: 'Approved', ss132: '1', category: 'ASAP' }
+}
+const required = ['ref', 'maalemNumber', 'maalemRef', 'name', 'areaMap', 'areaReport', 'subZone', 'engineer', 'developer', 'masterPlanStatus', 'siteSurveyor', 'corridors', 'ducts', 'category']
+const opts = { areaReport: ['Full', 'Partial', 'Not available', 'Pending'], zone: ['Zone 1', 'Zone 2', 'Zone 3'], masterPlanStatus: ['Approved', 'Under review', 'Draft'], corridors: ['Approved', 'Pending', 'Not required'], category: ['ASAP', 'Residential', 'Commercial', 'Mixed use', 'Industrial'] }
+
+type Picker = null | 'developer' | 'consultant'
+interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string }
+interface Remark { id: string; text: string; createdBy: string; createdOn: string; active: boolean }
+
+export default function ProjectFormPage() {
+  const { id = 'new' } = useParams()
+  const navigate = useNavigate()
+  const project = projects.find((p) => p.id === id)
+  const isNew = id === 'new'
+  const [v, setV] = useState<Values>(isNew || !project ? emptyValues : detailsFor(project))
+  const [editable, setEditable] = useState(isNew)
+  const [errors, setErrors] = useState<Set<string>>(new Set())
+  const [tab, setTab] = useState('Project details')
+  const [picker, setPicker] = useState<Picker>(null)
+  const [toast, say] = useToast()
+  const [existing, setExisting] = useState<SubRow[]>(!isNew ? [{ id: 's1', name: 'Towers of Kifaf', status: 'Developer', createdOn: '2025-11-13T08:19:45', createdBy: 'Mariam Mohamed Alhosani', active: true, scada: 'TWRKIFAF' }] : [])
+  const [future, setFuture] = useState<SubRow[]>([])
+  const [subModal, setSubModal] = useState<null | 'existing' | 'future'>(null)
+  const [remarks, setRemarks] = useState<Remark[]>([])
+  const [remarkModal, setRemarkModal] = useState(false)
+
+  const ro = !editable
+  const set = (k: string, val: string) => { setV((p) => ({ ...p, [k]: val })); setErrors((e) => { const n = new Set(e); n.delete(k); return n }) }
+  const err = (k: string) => (errors.has(k) ? 'This field is required' : undefined)
+  const text = (k: string, label: string, type?: string) => <TextField label={label} value={v[k]} type={type} required={required.includes(k)} error={err(k)} readOnly={ro} onChange={(x) => set(k, x)} />
+  const sel = (k: string, label: string, o: string[]) => <SelectField label={label} value={v[k]} options={o} required={required.includes(k)} error={err(k)} disabled={ro} onChange={(x) => set(k, x)} />
+  const rad = (k: string, label: string) => <RadioField label={label} value={v[k]} required={required.includes(k)} error={err(k)} disabled={ro} onChange={(x) => set(k, x)} />
+
+  const save = () => {
+    const missing = new Set(required.filter((k) => !v[k].trim()))
+    setErrors(missing)
+    if (missing.size) { say('Please fill the required fields'); return }
+    say('Project saved'); setTimeout(() => navigate('/projects'), 900)
+  }
+  const tabs = isNew ? ['Project details'] : ['Project details', 'Substation', 'Remarks']
+
+  return (
+    <div className="page">
+      <PageHeader title={isNew ? 'New project' : (project?.name ?? 'Project')} subtitle={isNew ? 'Fields marked * are required' : `REF# ${project?.maalemRef ?? id} · ${editable ? 'Editing' : 'View only — click Enable to edit'}`}
+        badge={!isNew && <StatusChip status={editable ? 'inprogress' : 'active'} label={editable ? 'Editing' : 'Active'} />}
+        actions={<>
+          {!isNew && <AppButton variant="outlined" startIcon={<FolderOpen size={16} />} onClick={() => navigate(`/projects/${id}/files/Area Map`)}>Files</AppButton>}
+          {!isNew && <AppButton variant="outlined" startIcon={editable ? <Ban size={16} /> : <Power size={16} />} onClick={() => setEditable(!editable)}>{editable ? 'Disable' : 'Enable'}</AppButton>}
+          <AppButton variant="outlined" startIcon={<X size={16} />} onClick={() => navigate('/projects')}>Close</AppButton>
+          {editable && <AppButton variant="contained" startIcon={<Save size={16} />} onClick={save}>Save</AppButton>}
+        </>} />
+
+      {!isNew && (
+        <div className="stats gap-section reveal">
+          <div className="stat"><small>Developer</small><strong style={{ fontSize: 16 }}>{v.developer}</strong></div>
+          <div className="stat"><small>Consultant</small><strong style={{ fontSize: 16 }}>{v.consultant || '—'}</strong></div>
+          <div className="stat"><small>Master plan</small><div style={{ marginTop: 4 }}><StatusChip status={v.masterPlanStatus === 'Approved' ? 'approved' : 'pending'} label={v.masterPlanStatus || '—'} /></div></div>
+          <div className="stat"><small>Category</small><div style={{ marginTop: 4 }}><span className="badge badge-accent">{v.category || '—'}</span></div></div>
+        </div>
+      )}
+
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <Tabs tabs={tabs} active={tab} onChange={setTab} />
+
+        {tab === 'Project details' && (
+          <div className="card-body stack">
+            <Section title="Identification" index={0}>
+              <div className="grid-auto">{text('ref', 'REF')}{text('maalemNumber', 'Maalem Dubai number')}{text('maalemRef', 'Maalem Dubai ref')}{text('name', 'Project name')}</div>
+            </Section>
+            <Section title="Area & zoning" index={1}>
+              <div className="grid-auto">{rad('areaMap', 'Area map')}{text('areaMapRef', 'Area map ref')}{sel('areaReport', 'Area report', opts.areaReport)}{sel('zone', 'Zone', opts.zone)}{text('subZone', 'Sub-zone')}</div>
+            </Section>
+            <Section title="Development status (%)" index={2}>
+              <div className="grid-auto">{text('built', 'Built %', 'number')}{text('underConstruction', 'Under construction %', 'number')}{text('vacant', 'Vacant %', 'number')}</div>
+            </Section>
+            <Section title="Stakeholders" index={3}>
+              <div className="grid-auto">
+                {text('engineer', 'Engineer')}{text('assistantEngineer', 'Assistant engineer')}
+                <PickField label="Developer name" required value={v.developer} error={err('developer')} disabled={ro} buttonLabel="Developer" onPick={() => setPicker('developer')} />
+                <PickField label="Consultant name" value={v.consultant} disabled={ro} buttonLabel="Consultant" onPick={() => setPicker('consultant')} />
+              </div>
+            </Section>
+            <Section title="Planning & infrastructure" index={4}>
+              <div className="grid-auto">
+                {sel('masterPlanStatus', 'Master plan status', opts.masterPlanStatus)}{rad('siteSurveyor', 'Site surveyor')}{sel('corridors', '11kV corridors', opts.corridors)}{sel('ducts', '11kV ducts', opts.corridors)}
+                {text('hvNoc', 'HV NOC')}{text('ss132', '132kV SS', 'number')}{text('ss400', '400kV SS', 'number')}{sel('category', 'Project category', opts.category)}
+              </div>
+            </Section>
+            {!isNew && (
+              <Section title="Totals" index={5}>
+                <div className="grid-auto"><TextField label="Total plots no" value="22" readOnly /><TextField label="Total TCL (MW)" value="327" readOnly /><TextField label="Total DCP (MW)" value="40" readOnly /></div>
+              </Section>
+            )}
+          </div>
+        )}
+
+        {tab === 'Substation' && (
+          <div className="card-body stack">
+            {(['existing', 'future'] as const).map((kind) => {
+              const rows = kind === 'existing' ? existing : future
+              const setRows = kind === 'existing' ? setExisting : setFuture
+              return (
+                <section key={kind} className="card" style={{ overflow: 'hidden' }}>
+                  <div className="card-head"><h4>{kind === 'existing' ? 'Existing substations' : 'Future substations'}</h4><AppButton variant="contained" size="small" startIcon={<Plus size={15} />} onClick={() => setSubModal(kind)}>Add</AppButton></div>
+                  <DataTable<SubRow>
+                    rows={rows} empty={`No ${kind} substations yet.`}
+                    columns={[
+                      ...(kind === 'future' ? [{ header: 'Commissioning', render: (r: SubRow) => r.commissioning || '—' }] : []),
+                      { header: 'Name', render: (r) => <strong>{r.name}</strong> },
+                      { header: 'Status', render: (r) => r.status },
+                      { header: 'Created', render: (r) => <><div>{r.createdBy}</div><div className="cell-sub">{fmtDate(r.createdOn)}</div></> },
+                      { header: 'Active', render: (r) => <StatusChip status={r.active ? 'active' : 'inactive'} label={String(r.active)} /> },
+                      { header: 'SCADA', render: (r) => r.scada },
+                      { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Delete', danger: true, onClick: () => { setRows(rows.filter((x) => x.id !== r.id)); say('Substation removed') } }]} /> },
+                    ]}
+                  />
+                </section>
+              )
+            })}
+          </div>
+        )}
+
+        {tab === 'Remarks' && (
+          <div>
+            <div className="card-head"><h4>Remarks log</h4><AppButton variant="contained" size="small" startIcon={<Plus size={15} />} onClick={() => setRemarkModal(true)}>Add</AppButton></div>
+            <DataTable<Remark>
+              rows={remarks} empty="No remarks yet."
+              columns={[
+                { header: 'Remark', render: (r) => r.text },
+                { header: 'Created', render: (r) => <><div>{r.createdBy}</div><div className="cell-sub">{fmtDate(r.createdOn)}</div></> },
+                { header: 'Active', render: (r) => <StatusChip status={r.active ? 'active' : 'inactive'} label={String(r.active)} /> },
+                { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Delete', danger: true, onClick: () => setRemarks(remarks.filter((x) => x.id !== r.id)) }]} /> },
+              ]}
+            />
+          </div>
+        )}
+      </div>
+
+      {picker === 'developer' && <LookupModal title="Select developer" items={developers.map((d) => d.name)} onPick={(x) => set('developer', x)} onClose={() => setPicker(null)} />}
+      {picker === 'consultant' && <LookupModal title="Select consultant" items={consultants.map((d) => d.name)} onPick={(x) => set('consultant', x)} onClose={() => setPicker(null)} />}
+      {subModal && <SubstationModal future={subModal === 'future'} onClose={() => setSubModal(null)} onSave={(r) => { (subModal === 'future' ? setFuture : setExisting)((p) => [...p, r]); setSubModal(null); say('Substation added') }} />}
+      {remarkModal && <RemarkModal onClose={() => setRemarkModal(false)} onSave={(r) => { setRemarks((p) => [...p, r]); setRemarkModal(false); say('Remark added') }} />}
+      {toast}
+    </div>
+  )
+}
+
+function SubstationModal({ future, onClose, onSave }: { future: boolean; onClose: () => void; onSave: (r: SubRow) => void }) {
+  const [name, setName] = useState('')
+  const [commissioning, setCommissioning] = useState('')
+  const sub = substations.find((s) => s.name === name)
+  return (
+    <Modal title={future ? 'Add future substation' : 'Add existing substation'} size="sm" onClose={onClose} footer={
+      <>
+        <AppButton variant="outlined" onClick={onClose}>Cancel</AppButton>
+        <AppButton variant="contained" disabled={!name} onClick={() => onSave({ id: String(Date.now()), name, status: sub?.builtBy ?? '', createdOn: new Date().toISOString(), createdBy: 'venkat reddy', active: true, scada: sub?.scada ?? '', commissioning })}>Save</AppButton>
+      </>
+    }>
+      <SelectField label="Substation" required value={name} options={substations.map((s) => s.name)} onChange={setName} />
+      {future && <TextField label="Commissioning date" type="date" value={commissioning} onChange={setCommissioning} />}
+    </Modal>
+  )
+}
+
+function RemarkModal({ onClose, onSave }: { onClose: () => void; onSave: (r: Remark) => void }) {
+  const [text, setText] = useState('')
+  const [active, setActive] = useState('true')
+  return (
+    <Modal title="Project remarks" size="sm" onClose={onClose} footer={
+      <>
+        <AppButton variant="outlined" onClick={onClose}>Cancel</AppButton>
+        <AppButton variant="contained" disabled={!text.trim()} onClick={() => onSave({ id: String(Date.now()), text, createdBy: 'venkat reddy', createdOn: new Date().toISOString(), active: active === 'true' })}>Save</AppButton>
+      </>
+    }>
+      <TextField label="Remark log" required multiline value={text} onChange={setText} />
+      <RadioField label="Is active?" required options={['true', 'false']} value={active} onChange={setActive} />
+    </Modal>
+  )
+}

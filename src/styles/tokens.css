@@ -1,0 +1,107 @@
+/* Design tokens — see design.md. All font tokens use Dubai (project requirement). */
+:root {
+  /* Backgrounds */
+  --bg-primary: #faf9f7;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f2efe9;
+  --bg-hover: #f5f2ec;
+  --bg-elevated: #ffffff;
+
+  /* Text */
+  --text-primary: #23221f;
+  --text-secondary: #5c5a54;
+  --text-tertiary: #8f8c83;
+  --text-inverse: #faf9f7;
+
+  /* Accent (teal) */
+  --accent-50: #e0f2ef;
+  --accent-100: #b8e1da;
+  --accent-500: #009685;
+  --accent-600: #007564;
+  --accent-700: #005a4d;
+
+  /* Status */
+  --color-success: #10b981;  --color-success-bg: #e6f7ef;
+  --color-warning: #f59e0b;  --color-warning-bg: #fdf1d7;
+  --color-danger: #d64545;   --color-danger-bg: #fbe7e7;
+  --color-info: #3b82f6;     --color-info-bg: #e3eefd;
+  --color-neutral: #8f8c83;  --color-neutral-bg: #eeece6;
+
+  /* Borders */
+  --border-light: #e6e2d9;
+  --border-medium: #d9d4c8;
+  --border-strong: #b7b1a4;
+
+  /* Glass */
+  --glass-bg: color-mix(in srgb, var(--bg-secondary) 78%, transparent);
+  --glass-border: color-mix(in srgb, var(--border-light) 64%, transparent);
+
+  /* Typography — Dubai everywhere */
+  --font-dubai: 'Dubai', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-heading: var(--font-dubai);
+  --font-body: var(--font-dubai);
+  --font-mono: var(--font-dubai);
+
+  /* Spacing */
+  --spacing-xs: 4px; --spacing-sm: 8px; --spacing-md: 16px; --spacing-lg: 24px; --spacing-xl: 32px;
+
+  /* Radius */
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-xl: 20px; --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 20px 40px -12px rgba(15, 23, 42, 0.18);
+  --shadow-xl: 0 28px 70px -24px rgba(15, 23, 42, 0.24);
+
+  /* Motion */
+  --transition-fast: 120ms ease;
+  --transition-base: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Layout */
+  --header-height: 52px;
+  --sidebar-collapsed: clamp(68px, 6vw, 82px);
+  --sidebar-expanded: clamp(240px, 20vw, 296px);
+  --content-pad-y: clamp(16px, 2vw, 28px);
+  --content-pad-x: clamp(12px, 2vw, 32px);
+
+  --backdrop: rgba(10, 15, 30, 0.52);
+  color-scheme: light;
+}
+
+html.dark {
+  --bg-primary: #0a0a09;
+  --bg-secondary: #141413;
+  --bg-tertiary: #1d1c1a;
+  --bg-hover: #252420;
+  --bg-elevated: #1a1917;
+
+  --text-primary: #f5f2ec;
+  --text-secondary: #b7b1a4;
+  --text-tertiary: #7a7668;
+  --text-inverse: #0a0a09;
+
+  --accent-50: #051f1a;
+  --accent-100: #0d3d35;
+  --accent-500: #2d9d91;
+  --accent-600: #34bfac;
+  --accent-700: #47d1bd;
+
+  --color-success: #34d399;  --color-success-bg: #0f2a21;
+  --color-warning: #fbbf24;  --color-warning-bg: #2c2410;
+  --color-danger: #f87171;   --color-danger-bg: #301616;
+  --color-info: #60a5fa;     --color-info-bg: #14233a;
+  --color-neutral: #a39f93;  --color-neutral-bg: #232220;
+
+  --border-light: #2a2824;
+  --border-medium: #3a3530;
+  --border-strong: #4a443c;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 40px -12px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 28px 70px -24px rgba(0, 0, 0, 0.7);
+
+  --backdrop: rgba(0, 0, 0, 0.72);
+  color-scheme: dark;
+}
