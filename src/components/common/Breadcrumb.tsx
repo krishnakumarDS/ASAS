@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
-const names: Record<string, string> = { projects: 'Projects', substations: 'Substations', plots: 'Plots', consultants: 'Consultants', developers: 'Developers', reports: 'Reports', new: 'New', files: 'Files', limits: 'Standard limits', single: 'Single' }
+const names: Record<string, string> = { projects: 'Projects', substations: 'Substations', plots: 'Plots', consultants: 'Consultants', developers: 'Developers', reports: 'Reports', trends: 'Trends', network: 'Network', integrations: 'Integrations', new: 'New', files: 'Files', limits: 'Standard limits', single: 'Single' }
 
 export default function Breadcrumb() {
   const parts = useLocation().pathname.split('/').filter(Boolean)

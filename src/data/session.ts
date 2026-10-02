@@ -11,7 +11,7 @@ export function hasEnteredThisLoad() {
   return entered
 }
 
-/** Back to the welcome screen (there is no sign-out: identity belongs to the Power Platform host). */
+/** "Log out": returns to the welcome/login screen. The Power Platform session itself belongs to the host, so it is not ended. */
 export function markLeft() {
   entered = false
 }

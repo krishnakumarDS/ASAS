@@ -13,7 +13,10 @@ import PlotWizardPage from './pages/PlotWizardPage'
 import ProjectFilesPage from './pages/ProjectFilesPage'
 import ProjectFormPage from './pages/ProjectFormPage'
 import ProjectsPage from './pages/ProjectsPage'
-import { ReportFormPage, ReportsPage } from './pages/ReportsPage'
+import IntegrationsPage from './pages/IntegrationsPage'
+import NetworkPage from './pages/NetworkPage'
+import ReportsPage from './pages/ReportsPage'
+import TrendsPage from './pages/TrendsPage'
 import StandardLimitsPage from './pages/StandardLimitsPage'
 import SubstationFormPage from './pages/SubstationFormPage'
 import SubstationsPage from './pages/SubstationsPage'
@@ -51,7 +54,9 @@ export default function App() {
           <Route path="developers" element={<PartiesListPage kind="developer" />} />
           <Route path="developers/:id" element={<PartyDetailPage kind="developer" />} />
           <Route path="reports" element={<ReportsPage />} />
-          <Route path="reports/:key" element={<ReportFormPage />} />
+          <Route path="trends" element={<TrendsPage />} />
+          <Route path="network" element={<NetworkPage />} />
+          <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="*" element={<EmptyState title="Page not found" description="The page you’re looking for doesn’t exist." />} />
         </Route>
       </Routes>

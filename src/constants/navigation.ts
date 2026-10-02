@@ -1,7 +1,7 @@
-import { BarChart3, Building2, Handshake, HardHat, LayoutDashboard, LineChart, MapPinned, Sparkles, Users, Zap } from 'lucide-react'
+import { BarChart3, Building2, Handshake, HardHat, LayoutDashboard, LineChart, MapPinned, Network, Plug, Sparkles, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export interface NavItem { id: string; label: string; icon: LucideIcon; path?: string; soon?: boolean }
+export interface NavItem { id: string; label: string; icon: LucideIcon; path?: string; action?: 'chat' }
 export interface NavGroup { id: string; label: string; items: NavItem[] }
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -12,15 +12,16 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { id: 'network', label: 'Network', items: [
     { id: 'substations', label: 'Substations', icon: Zap, path: '/substations' },
+    { id: 'network', label: 'Network & heatmaps', icon: Network, path: '/network' },
   ] },
   { id: 'directory', label: 'Directory', items: [
     { id: 'developers', label: 'Developers', icon: HardHat, path: '/developers' },
     { id: 'consultants', label: 'Consultants', icon: Handshake, path: '/consultants' },
   ] },
   { id: 'insights', label: 'Insights', items: [
-    { id: 'reports', label: 'Reports', icon: BarChart3, path: '/reports' },
-    { id: 'trends', label: 'Trends & forecasts', icon: LineChart, soon: true },
-    { id: 'workload', label: 'Workload', icon: Users, soon: true },
-    { id: 'ai', label: 'AI assistant', icon: Sparkles, soon: true },
+    { id: 'reports', label: 'Reports & decks', icon: BarChart3, path: '/reports' },
+    { id: 'trends', label: 'Trends & forecast', icon: LineChart, path: '/trends' },
+    { id: 'integrations', label: 'Integrations', icon: Plug, path: '/integrations' },
+    { id: 'ai', label: 'AI assistant', icon: Sparkles, action: 'chat' },
   ] },
 ]

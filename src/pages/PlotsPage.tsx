@@ -1,41 +1,45 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, MapPin, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
+import AiUpload, { FIELDS } from '../components/AiUpload'
 import AppButton from '../components/common/AppButton'
 import ConfirmationDialog from '../components/common/ConfirmationDialog'
 import IconButton from '../components/common/IconButton'
 import StatusChip from '../components/common/StatusChip'
 import PageHeader from '../components/PageHeader'
-import { AppInput, DataTable, FilterBar, Pager, usePaged, useToast } from '../components/ui'
+import { AiSearchBar, AppInput, DataTable, Pager, matchQuery, usePaged, useSort, useToast } from '../components/ui'
 import { plots as seed } from '../data/mock'
 import type { Plot } from '../data/mock'
+import { projects } from '../data/projects'
 
-const keys = ['name', 'ref', 'developer', 'devPlot', 'dmPlot', 'scada', 'substation', 'consultant'] as const
-type K = (typeof keys)[number]
-const blank = Object.fromEntries(keys.map((k) => [k, ''])) as Record<K, string>
+const SUGGEST = ['hidden plots', 'Al Wasl', 'AECOM', 'plots without consultant']
 
 export default function PlotsPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<Plot[]>(seed)
-  const [draft, setDraft] = useState(blank)
-  const [applied, setApplied] = useState(blank)
+  const [q, setQ] = useState('')
+  const [ref, setRef] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirm, setConfirm] = useState(false)
+  const [upload, setUpload] = useState(false)
   const [toast, say] = useToast()
-  const has = (v: string, q: string) => v.toLowerCase().includes(q.toLowerCase())
-  const filtered = useMemo(() => rows.filter((r) => has(r.projectName, applied.name) && has(r.maalemRef, applied.ref) && has(r.devPlot, applied.devPlot) && has(r.dmPlot, applied.dmPlot) && has(r.developer, applied.developer) && has(r.consultant, applied.consultant)), [rows, applied])
-  const { visible, page, pages, setPage } = usePaged(filtered, 8)
+  const filtered = useMemo(() => rows.filter((r) =>
+    matchQuery(`${r.projectName} ${r.maalemRef} ${r.devPlot} ${r.dmPlot} ${r.developer} ${r.consultant || 'without consultant'} ${r.display ? 'visible' : 'hidden'}`, q) && r.maalemRef.toLowerCase().includes(ref.toLowerCase())), [rows, q, ref])
+  const { sorted, sortFor } = useSort(filtered, { project: (r) => r.projectName, dev: (r) => r.devPlot, dm: (r) => r.dmPlot, developer: (r) => r.developer, consultant: (r) => r.consultant, display: (r) => String(r.display) })
+  const { visible, page, pages, setPage } = usePaged(sorted, 8)
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
-  const f = (k: K, label: string) => <AppInput key={k} label={label} placeholder={label} value={draft[k]} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} />
 
   return (
     <div className="page">
       <PageHeader title="Plots" subtitle="Developer and DM plot numbers per project" back={false}
-        actions={<AppButton variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate('/plots/new')}>Add plots</AppButton>} />
-      <FilterBar resultText={`${filtered.length} plots`} onSearch={() => { setApplied(draft); setPage(1) }} onClear={() => { setDraft(blank); setApplied(blank) }}
-        advanced={<>{f('devPlot', 'Developer plot no.')}{f('dmPlot', 'DM plot no.')}{f('scada', 'Sub. SCADA name')}{f('substation', 'Substation name')}{f('consultant', 'Consultant')}</>}>
-        {f('name', 'Project name')}{f('ref', 'Project ref.')}{f('developer', 'Developer')}
-      </FilterBar>
+        actions={<>
+          <AppButton variant="outlined" startIcon={<Sparkles size={16} />} onClick={() => setUpload(true)}>AI upload</AppButton>
+          <AppButton variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate('/plots/new')}>Add plot</AppButton>
+        </>} />
+      <AiSearchBar value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Ask in plain words — e.g. “hidden plots for Al Wasl”" suggestions={SUGGEST} resultText={`${filtered.length} of ${rows.length} plots`} />
+      <div className="card toolbar reveal-item" style={{ paddingBottom: 4 }}>
+        <div className="toolbar-grid"><AppInput label="Maalem Dubai reference" placeholder="MP-00000-000" value={ref} onChange={(e) => { setRef(e.target.value); setPage(1) }} /></div>
+      </div>
       <div className="card reveal-item">
         {selected.size > 0 && (
           <div className="row between wrap" style={{ padding: '10px 20px', background: 'var(--accent-50)', borderBottom: '1px solid var(--accent-100)' }} role="status">
@@ -47,19 +51,19 @@ export default function PlotsPage() {
           </div>
         )}
         <DataTable<Plot>
-          rows={visible} empty="No plots found."
+          rows={visible} empty="No plots match your search."
           columns={[
             { header: '', render: (r) => <input type="checkbox" className="cb" checked={selected.has(r.id)} onChange={() => toggle(r.id)} aria-label={`Select plot ${r.devPlot}`} /> },
-            { header: 'Project', render: (r) => <><strong>{r.projectName}</strong><div className="cell-sub num">{r.maalemRef}</div></> },
-            { header: 'Dev plot', render: (r) => <span className="num">{r.devPlot}</span> },
-            { header: 'DM plot', render: (r) => <span className="num">{r.dmPlot}</span> },
-            { header: 'Developer', render: (r) => r.developer },
-            { header: 'Consultant', render: (r) => r.consultant || '—' },
-            { header: 'Smart Office', render: (r) => <StatusChip status={r.display ? 'visible' : 'hidden'} /> },
+            { header: 'Project', sort: sortFor('project'), render: (r) => <><strong>{r.projectName}</strong><div className="cell-sub num">{r.maalemRef}</div></> },
+            { header: 'Dev plot', sort: sortFor('dev'), render: (r) => <span className="num">{r.devPlot}</span> },
+            { header: 'DM plot', sort: sortFor('dm'), render: (r) => <span className="num">{r.dmPlot}</span> },
+            { header: 'Developer', sort: sortFor('developer'), render: (r) => r.developer },
+            { header: 'Consultant', sort: sortFor('consultant'), render: (r) => r.consultant || '—' },
+            { header: 'Smart Office', sort: sortFor('display'), render: (r) => <StatusChip status={r.display ? 'visible' : 'hidden'} /> },
             { header: 'Actions', align: 'right', render: (r) => (
               <div className="row" style={{ justifyContent: 'flex-end', gap: 2 }}>
                 <IconButton small title="Edit" aria-label="Edit" onClick={() => navigate(`/plots/${r.id}`)}><Pencil size={17} /></IconButton>
-                <IconButton small title="Map" aria-label="Map"><MapPin size={17} /></IconButton>
+                <IconButton small title="Map" aria-label="Map" onClick={() => navigate('/network')}><MapPin size={17} /></IconButton>
                 <IconButton small title="View" aria-label="View" onClick={() => navigate(`/plots/${r.id}`)}><Eye size={17} /></IconButton>
               </div>
             ) },
@@ -69,6 +73,10 @@ export default function PlotsPage() {
       </div>
       <ConfirmationDialog open={confirm} title="Delete plots" message={`Delete ${selected.size} selected plot(s)?`} confirmLabel="Delete" destructive
         onConfirm={() => { setRows(rows.filter((r) => !selected.has(r.id))); setSelected(new Set()) }} onClose={() => setConfirm(false)} />
+      {upload && <AiUpload entity="Plots" fields={FIELDS.plots} onClose={() => setUpload(false)} onImport={(imp) => {
+        setRows((r) => [...imp.map((o, i): Plot => { const pr = projects.find((p) => p.maalemRef === o.maalemRef); return { id: `u${Date.now()}${i}`, maalemRef: o.maalemRef, projectName: pr?.name ?? '', devPlot: o.devPlot, dmPlot: o.dmPlot ?? '', developer: o.developer || pr?.developer || '', consultant: o.consultant ?? '', display: true } }), ...r])
+        say(`${imp.length} plots imported`)
+      }} />}
       {toast}
     </div>
   )

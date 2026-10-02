@@ -8,6 +8,7 @@ import StatusChip from '../components/common/StatusChip'
 import { Columns, Donut, HBars, MiniBar, StackedColumns } from '../components/charts'
 import type { ChartColor } from '../components/charts'
 import { DataTable } from '../components/ui'
+import { openChat } from '../components/ai/AiChat'
 import { useAuth } from '../context/AuthContext'
 import { active, byStatus, byType, engineers, examples, exceeding, insights, kpiCompliance, kpis, pmpCategories } from '../data/dashboard'
 
@@ -32,12 +33,11 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
   const now = new Date()
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
   const today = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now)
-  const ask = () => question.trim() && setAnswer(`“${question.trim()}” — the AI assistant isn’t connected yet. Once it is, answers appear here.`)
+  const ask = () => { if (question.trim()) { openChat(question.trim()); setQuestion('') } }
 
   return (
     <div className="page">
@@ -55,7 +55,7 @@ export default function DashboardPage() {
           <div className="row wrap" style={{ gap: 10 }}>
             <AppButton variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate('/projects/new')}>New project</AppButton>
             <AppButton variant="outlined" startIcon={<BarChart3 size={16} />} onClick={() => navigate('/reports')}>Reports</AppButton>
-            <AppButton variant="outlined" startIcon={<Sparkles size={16} />} onClick={() => document.getElementById('ai')?.scrollIntoView({ behavior: 'smooth' })}>AI assistant</AppButton>
+            <AppButton variant="outlined" startIcon={<Sparkles size={16} />} onClick={() => openChat()}>AI assistant</AppButton>
           </div>
         </div>
       </section>
@@ -111,8 +111,7 @@ export default function DashboardPage() {
             <input className="input" placeholder="Ask a question…" aria-label="Ask ASAS" value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && ask()} />
             <AppButton variant="contained" onClick={ask} aria-label="Send"><Send size={15} /></AppButton>
           </div>
-          {answer && <p style={{ marginTop: 12, padding: 12, borderRadius: 'var(--radius-md)', background: 'var(--accent-50)', color: 'var(--accent-600)', fontSize: 13 }} role="status">{answer}</p>}
-          <div className="row wrap" style={{ gap: 6, marginTop: 14 }}>{examples.map((e) => <button key={e} className="chip" onClick={() => setQuestion(e)}>{e}</button>)}</div>
+          <div className="row wrap" style={{ gap: 6, marginTop: 14 }}>{examples.map((e) => <button key={e} className="chip" onClick={() => openChat(e)}>{e}</button>)}</div>
         </Panel>
       </div>
 

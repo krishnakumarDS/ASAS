@@ -9,5 +9,6 @@
   "region": "prod",
   "connectionReferences": {},
   "databaseReferences": {},
-  "version": "1.0"
+  "version": "1.0",
+  "appId": "df13c244-2811-404e-b975-b8f2f29e538e"
 }

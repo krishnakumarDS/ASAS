@@ -1,85 +1,93 @@
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Building2, ClipboardList, HardHat, Handshake, MapPinned, Send, Users, Zap } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Building2, Download, FileSpreadsheet, FileText, HardHat, Handshake, MapPinned, Presentation, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import PageHeader from '../components/PageHeader'
-import { LookupModal, PickField, TextField, useToast } from '../components/ui'
-import { consultants, developers } from '../data/mock'
-import { projects } from '../data/projects'
+import { consultants, developers, plots, substations } from '../data/mock'
+import { consultantByProject, projects } from '../data/projects'
+import { useToast } from '../components/ui'
 
-type Tone = 'accent' | 'info' | 'warning' | 'danger' | 'neutral' | 'success'
-interface Report { key: string; title: string; desc: string; icon: LucideIcon; tone: Tone; pick?: { label: string; button: string; items: string[] } }
-
-const reports: Report[] = [
-  { key: 'projects', title: 'Projects report', desc: 'All projects with developer, consultant and status.', icon: Building2, tone: 'accent' },
-  { key: 'developers', title: 'Developers report', desc: 'Developer portfolios and project counts.', icon: HardHat, tone: 'success' },
-  { key: 'developer-issues', title: 'Developer issues report', desc: 'Open issues raised against a developer.', icon: ClipboardList, tone: 'warning', pick: { label: 'Developer', button: 'Developer', items: developers.map((d) => d.name) } },
-  { key: 'substations', title: 'Substations report', desc: 'Substation list with SCADA names and builders.', icon: Zap, tone: 'neutral' },
-  { key: 'consultants', title: 'Consultants report', desc: 'Consultant directory with linked projects.', icon: Users, tone: 'danger' },
-  { key: 'consultant-issues', title: 'Consultant issues report', desc: 'Open issues raised against a consultant.', icon: Handshake, tone: 'info', pick: { label: 'Consultant', button: 'Consultant', items: consultants.map((c) => c.name) } },
-  { key: 'plots', title: 'Plot report for a single project', desc: 'Plot-level load details for one project.', icon: MapPinned, tone: 'accent', pick: { label: 'Project', button: 'Project', items: projects.map((p) => `${p.maalemRef} – ${p.name}`) } },
+type Row = Record<string, string | number | boolean>
+interface Source { key: string; label: string; icon: LucideIcon; rows: () => Row[] }
+const SOURCES: Source[] = [
+  { key: 'projects', label: 'Projects', icon: Building2, rows: () => projects.map((p) => ({ 'Maalem ref': p.maalemRef, Project: p.name, Developer: p.developer, Consultant: consultantByProject[p.id] ?? '', 'Created by': p.createdBy, 'Created on': p.createdOn, Displayed: p.display })) },
+  { key: 'plots', label: 'Plots', icon: MapPinned, rows: () => plots.map((p) => ({ 'Maalem ref': p.maalemRef, Project: p.projectName, 'Dev plot': p.devPlot, 'DM plot': p.dmPlot, Developer: p.developer, Consultant: p.consultant, Displayed: p.display })) },
+  { key: 'substations', label: 'Substations', icon: Zap, rows: () => substations.map((s) => ({ Substation: s.name, SCADA: s.scada, 'Built by': s.builtBy, 'Smart Office': s.showInSO, 'Created on': s.createdOn })) },
+  { key: 'developers', label: 'Developers', icon: HardHat, rows: () => developers.map((d) => ({ Developer: d.name, 'Created by': d.createdBy, 'Created on': d.createdOn, 'Linked projects': projects.filter((p) => p.developer.split(' (')[0] === d.name.split(' (')[0]).length })) },
+  { key: 'consultants', label: 'Consultants', icon: Handshake, rows: () => consultants.map((c) => ({ Consultant: c.name, 'Created by': c.createdBy, 'Created on': c.createdOn, 'Linked projects': projects.filter((p) => consultantByProject[p.id] === c.name).length })) },
 ]
-const toneVar: Record<Tone, string> = { accent: 'var(--accent-600)', info: 'var(--color-info)', warning: 'var(--color-warning)', danger: 'var(--color-danger)', neutral: 'var(--color-neutral)', success: 'var(--color-success)' }
+const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+const toCsv = (title: string, rows: Row[]) => (rows.length ? [title.toUpperCase(), Object.keys(rows[0]).join(','), ...rows.map((r) => Object.values(r).map(esc).join(','))].join('\n') : title.toUpperCase())
 
-export function ReportsPage() {
-  return (
-    <div className="page">
-      <PageHeader title="Reports" subtitle="Generate a report and email it" back={false} />
-      <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))' }}>
-        {reports.map(({ key, title, desc, icon: Icon, tone }, i) => (
-          <Link key={key} to={`/reports/${key}`} className="card lift pad reveal-item report" style={{ ['--index' as string]: i, ['--tone' as string]: toneVar[tone] }}>
-            <span className="report-ico"><Icon size={22} /></span>
-            <h5 style={{ marginTop: 14 }}>{title}</h5>
-            <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>{desc}</p>
-          </Link>
-        ))}
-      </div>
-    </div>
-  )
-}
+const DECKS = [
+  { name: 'Executive KPI deck', desc: 'Department KPIs, compliance and workload in a single summary.' },
+  { name: 'Project review deck', desc: 'One project with plots, substations and open issues.' },
+  { name: 'Network & forecast deck', desc: 'Trends, heatmaps and constraint risk for planning.' },
+]
 
-const emailOk = (s: string) => s.split(/[;,]/).map((x) => x.trim()).filter(Boolean).every((x) => /^\S+@\S+\.\S+$/.test(x))
-
-export function ReportFormPage() {
-  const { key } = useParams()
-  const navigate = useNavigate()
-  const report = reports.find((r) => r.key === key)
-  const [subject, setSubject] = useState('')
-  const [to, setTo] = useState('')
-  const [cc, setCc] = useState('')
-  const [lookup, setLookup] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+export default function ReportsPage() {
+  const [sel, setSel] = useState<Set<string>>(new Set(['projects']))
+  const [format, setFormat] = useState<'csv' | 'pdf' | 'pptx'>('csv')
   const [toast, say] = useToast()
-  if (!report) return <PageHeader title="Report not found" />
-  const Icon = report.icon
+  const counts = useMemo(() => Object.fromEntries(SOURCES.map((s) => [s.key, s.rows().length])), [])
+  const total = [...sel].reduce((a, k) => a + (counts[k] ?? 0), 0)
+  const toggle = (k: string) => setSel((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
 
-  const toErr = submitted ? (!to.trim() ? 'This field is required' : !emailOk(to) ? 'Enter valid email address(es)' : undefined) : undefined
-  const ccErr = submitted && cc.trim() && !emailOk(cc) ? 'Enter valid email address(es)' : undefined
-  const subjErr = submitted && report.pick && !subject ? 'This field is required' : undefined
-  const send = () => {
-    setSubmitted(true)
-    if (!to.trim() || !emailOk(to) || (cc.trim() && !emailOk(cc)) || (report.pick && !subject)) return
-    say('Report sent'); setTimeout(() => navigate('/reports'), 1000)
+  const generate = () => {
+    const body = SOURCES.filter((s) => sel.has(s.key)).map((s) => toCsv(s.label, s.rows())).join('\n\n')
+    const url = URL.createObjectURL(new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8' }))
+    const a = Object.assign(document.createElement('a'), { href: url, download: `asas-report-${new Date().toISOString().slice(0, 10)}.csv` })
+    a.click(); URL.revokeObjectURL(url)
+    say(`Report generated — ${total} rows`)
   }
 
   return (
     <div className="page">
-      <PageHeader title={report.title} subtitle={report.desc} />
-      <div className="card pad reveal-item" style={{ maxWidth: 640, margin: '0 auto' }}>
-        <div className="row" style={{ gap: 12, marginBottom: 20 }}>
-          <span className="report-ico" style={{ ['--tone' as string]: toneVar[report.tone] }}><Icon size={22} /></span>
-          <div><h5>Email this report</h5><p className="muted" style={{ fontSize: 13 }}>Separate multiple addresses with commas or semicolons.</p></div>
-        </div>
-        {report.pick && <PickField label={report.pick.label} required value={subject} error={subjErr} buttonLabel={report.pick.button} onPick={() => setLookup(true)} />}
-        <TextField label="Email to" required value={to} error={toErr} onChange={setTo} placeholder="name@dewa.gov.ae" />
-        <TextField label="Email CC" value={cc} error={ccErr} onChange={setCc} />
-        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
-          <AppButton variant="outlined" onClick={() => navigate('/reports')}>Cancel</AppButton>
-          <AppButton variant="contained" startIcon={<Send size={16} />} onClick={send}>Send report</AppButton>
-        </div>
+      <PageHeader title="Reports & presentations" subtitle="Pick what to include and generate in one go" back={false} />
+      <div className="grid-main-side">
+        <section className="card reveal-item">
+          <div className="card-head"><h4>1 · Choose what to include</h4><span className="faint" style={{ fontSize: 12 }}>Select one or more</span></div>
+          <div className="card-body">
+            <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+              {SOURCES.map(({ key, label, icon: Icon }) => (
+                <label key={key} className={`pick ${sel.has(key) ? 'on' : ''}`}>
+                  <input type="checkbox" className="cb" checked={sel.has(key)} onChange={() => toggle(key)} />
+                  <span className="pick-ico"><Icon size={18} /></span>
+                  <span className="grow"><b>{label}</b><span className="cell-sub" style={{ display: 'block' }}>{counts[key]} records</span></span>
+                </label>
+              ))}
+            </div>
+            <div className="row" style={{ gap: 8, marginTop: 14 }}>
+              <AppButton variant="outlined" size="small" onClick={() => setSel(new Set(SOURCES.map((s) => s.key)))}>Select all</AppButton>
+              <AppButton variant="outlined" size="small" onClick={() => setSel(new Set())}>Clear</AppButton>
+            </div>
+          </div>
+        </section>
+        <section className="card reveal-item">
+          <div className="card-head"><h4>2 · Format & generate</h4></div>
+          <div className="card-body">
+            <div className="radio-group" style={{ flexDirection: 'column' }}>
+              {([['csv', 'Excel / CSV', FileSpreadsheet, false], ['pdf', 'PDF', FileText, true], ['pptx', 'PowerPoint', Presentation, true]] as const).map(([k, l, Icon, soon]) => (
+                <label key={k} className="radio" style={soon ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}><input type="radio" name="fmt" disabled={soon} checked={format === k} onChange={() => setFormat(k)} /><Icon size={16} />{l}{soon && <span className="badge badge-neutral" style={{ marginLeft: 'auto' }}>Soon</span>}</label>
+              ))}
+            </div>
+            <p className="muted" style={{ margin: '16px 0', fontSize: 13 }}>{sel.size ? <><b>{sel.size}</b> section{sel.size > 1 ? 's' : ''} · <b>{total}</b> rows, in one file.</> : 'Select at least one section.'}</p>
+            <AppButton variant="contained" fullWidth disabled={!sel.size} startIcon={<Download size={16} />} onClick={generate}>Generate report</AppButton>
+          </div>
+        </section>
       </div>
-      {lookup && report.pick && <LookupModal title={`Select ${report.pick.label.toLowerCase()}`} items={report.pick.items} onPick={setSubject} onClose={() => setLookup(false)} />}
+      <section className="reveal-item" style={{ marginTop: 20 }}>
+        <div className="row" style={{ gap: 10, marginBottom: 12 }}><h4>Presentations</h4><span className="badge badge-neutral">Coming soon</span></div>
+        <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+          {DECKS.map((d) => (
+            <div key={d.name} className="card pad" style={{ opacity: 0.85 }}>
+              <span className="avatar" style={{ borderRadius: 'var(--radius-md)' }}><Presentation size={18} /></span>
+              <h5 style={{ marginTop: 12 }}>{d.name}</h5>
+              <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>{d.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
       {toast}
     </div>
   )

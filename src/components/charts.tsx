@@ -81,3 +81,26 @@ export function HBars({ data, color = 'info' }: { data: { label: string; value: 
 export function MiniBar({ pct, color = 'success' }: { pct: number; color?: ChartColor }) {
   return <span className={styles.bar}><i style={{ width: `${pct}%`, background: pick(color) }} /></span>
 }
+
+export function LineChart({ labels, actual, forecast, height = 240, unit = '' }: { labels: string[]; actual: number[]; forecast: number[]; height?: number; unit?: string }) {
+  const all = [...actual, ...forecast.filter((v) => !Number.isNaN(v))]
+  const max = Math.max(...all) * 1.1, min = Math.min(...all) * 0.9
+  const W = 600, H = 220, pad = 28
+  const x = (i: number) => pad + (i / (labels.length - 1)) * (W - pad * 2)
+  const y = (v: number) => H - pad - ((v - min) / (max - min || 1)) * (H - pad * 2)
+  const path = (vals: number[]) => vals.map((v, i) => (Number.isNaN(v) ? null : `${i === vals.findIndex((q) => !Number.isNaN(q)) ? 'M' : 'L'}${x(i)},${y(v)}`)).filter(Boolean).join(' ')
+  const lastA = actual.length - 1
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ height }} role="img" aria-label="Actual and forecast trend">
+        {[0, 0.25, 0.5, 0.75, 1].map((t) => <g key={t}><line x1={pad} x2={W - pad} y1={pad + t * (H - pad * 2)} y2={pad + t * (H - pad * 2)} stroke="var(--border-light)" strokeWidth="1" /><text x={4} y={pad + t * (H - pad * 2) + 4} fontSize="10" fill="var(--text-tertiary)">{Math.round(max - t * (max - min))}{unit}</text></g>)}
+        <path d={`${path(forecast)} L${x(labels.length - 1)},${H - pad} L${x(lastA)},${H - pad} Z`} fill="var(--accent-600)" opacity="0.07" />
+        <path d={path(forecast)} fill="none" stroke="var(--accent-600)" strokeWidth="2.5" strokeDasharray="6 5" strokeLinecap="round" />
+        <path d={path(actual)} fill="none" stroke="var(--color-info)" strokeWidth="2.5" strokeLinecap="round" />
+        {actual.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r="3.5" fill="var(--bg-secondary)" stroke="var(--color-info)" strokeWidth="2" />)}
+        {labels.map((l, i) => (i % 2 === 0 || labels.length < 10) && <text key={l + i} x={x(i)} y={H - 8} fontSize="10" textAnchor="middle" fill="var(--text-tertiary)">{l}</text>)}
+      </svg>
+      <ul className={styles.legend} style={{ flexDirection: 'row', display: 'flex', gap: 18, marginTop: 8 }}><li><i style={{ background: 'var(--color-info)' }} />Actual</li><li><i style={{ background: 'var(--accent-600)' }} />Forecast</li></ul>
+    </div>
+  )
+}

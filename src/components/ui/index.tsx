@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, MoreVertical, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Sparkles, ChevronLeft, ChevronRight, MoreVertical, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
 import AppButton from '../common/AppButton'
 import EmptyState from '../common/EmptyState'
 import IconButton from '../common/IconButton'
@@ -139,7 +139,7 @@ export function Tabs({ tabs, active, onChange }: { tabs: string[]; active: strin
   )
 }
 
-export interface Column<T> { header: string; render: (row: T) => ReactNode; align?: 'right'; sort?: { asc: boolean; onToggle: () => void } }
+export interface Column<T> { header: string; render: (row: T) => ReactNode; align?: 'right'; sort?: { active: boolean; asc: boolean; onToggle: () => void } }
 export function DataTable<T extends { id: string }>({ columns, rows, empty = 'No records found.' }: { columns: Column<T>[]; rows: T[]; empty?: string }) {
   return (
     <div className="table-wrap">
@@ -147,8 +147,8 @@ export function DataTable<T extends { id: string }>({ columns, rows, empty = 'No
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.header} className={c.align} aria-sort={c.sort ? (c.sort.asc ? 'ascending' : 'descending') : undefined}>
-                {c.sort ? <button className="sort-btn" onClick={c.sort.onToggle}>{c.header}{c.sort.asc ? <ArrowUp size={12} /> : <ArrowDown size={12} />}</button> : c.header}
+              <th key={c.header} className={c.align} aria-sort={c.sort?.active ? (c.sort.asc ? 'ascending' : 'descending') : undefined}>
+                {c.sort ? <button className="sort-btn" onClick={c.sort.onToggle}>{c.header}{c.sort.active ? (c.sort.asc ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} style={{ opacity: 0.4 }} />}</button> : c.header}
               </th>
             ))}
           </tr>
@@ -216,5 +216,51 @@ export function FilterBar({ children, advanced, onSearch, onClear, resultText }:
       {advanced && open && <div className="advanced"><div className="toolbar-grid">{advanced}</div></div>}
       {resultText && <div className="faint" style={{ fontSize: 12 }}>{resultText}</div>}
     </form>
+  )
+}
+
+/* ---------- sorting ---------- */
+/** Click-to-sort for any column: `getters` maps a column key to a sortable value. Sort happens before paging. */
+export function useSort<T>(rows: T[], getters: Record<string, (r: T) => string | number>) {
+  const [key, setKey] = useState<string | null>(null)
+  const [asc, setAsc] = useState(true)
+  const g = useRef(getters)
+  g.current = getters
+  const sorted = useMemo(() => {
+    if (!key || !g.current[key]) return rows
+    const get = g.current[key]
+    return [...rows].sort((a, b) => {
+      const x = get(a), y = get(b)
+      const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: 'base' })
+      return asc ? c : -c
+    })
+  }, [rows, key, asc])
+  const sortFor = (k: string) => ({ active: key === k, asc, onToggle: () => { if (key === k) setAsc(!asc); else { setKey(k); setAsc(true) } } })
+  return { sorted, sortFor }
+}
+
+/* ---------- smart (natural-language) search ---------- */
+const STOP = new Set(['show', 'me', 'all', 'find', 'list', 'the', 'of', 'for', 'with', 'in', 'a', 'an', 'and', 'by', 'who', 'which', 'are', 'is', 'that', 'have', 'has', 'get', 'give', 'display'])
+/** Words naming the list itself ("hidden projects") are optional — they only count if they actually appear in the row. */
+const ENTITY = new Set(['project', 'plot', 'substation', 'developer', 'consultant', 'record', 'item', 'result'])
+/** Every other meaningful word in the query must appear somewhere in the row's text. */
+export function matchQuery(text: string, query: string) {
+  const t = text.toLowerCase()
+  return query.toLowerCase().split(/[\s,]+/).filter((w) => w && !STOP.has(w)).every((w) => t.includes(w) || ENTITY.has(w.replace(/s$/, '')))
+}
+
+export function AiSearchBar({ value, onChange, placeholder, suggestions = [], resultText }: { value: string; onChange: (v: string) => void; placeholder: string; suggestions?: string[]; resultText?: string }) {
+  return (
+    <div className="card toolbar ai-search reveal-item">
+      <div className="ai-input">
+        <Sparkles size={18} className="ai-ico" />
+        <input className="input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label="Smart search" />
+        {value && <IconButton small onClick={() => onChange('')} aria-label="Clear search"><X size={16} /></IconButton>}
+      </div>
+      <div className="row wrap" style={{ gap: 8, marginTop: 10 }}>
+        {resultText && <span className="faint" style={{ fontSize: 12, marginRight: 4 }}>{resultText}</span>}
+        {suggestions.map((s) => <button key={s} type="button" className="chip" onClick={() => onChange(s)}>{s}</button>)}
+      </div>
+    </div>
   )
 }

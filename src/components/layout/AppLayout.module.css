@@ -1,7 +1,7 @@
 .shell { display: flex; min-height: 100vh; }
 .sidebar { position: sticky; top: 0; height: 100vh; flex-shrink: 0; width: var(--sidebar-expanded); background: linear-gradient(180deg, var(--accent-500) 0%, var(--accent-600) 30%, var(--accent-700) 100%); color: #fff; border-right: none; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; transition: width var(--transition-base), transform var(--transition-base); z-index: 40; }
 .collapsed { width: var(--sidebar-collapsed); }
-.brand { height: var(--header-height); display: flex; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,.12); flex-shrink: 0; }
+.brand { min-height: var(--header-height); display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.12); flex-shrink: 0; }
 .collapsed .brand { justify-content: center; padding: 0; }
 .logo { width: 30px; height: 30px; border-radius: var(--radius-md); background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3); color: #fff; display: grid; place-items: center; flex-shrink: 0; box-shadow: var(--shadow-sm); }
 .brandText { line-height: 1.15; min-width: 0; }
@@ -21,11 +21,11 @@
 .soon { margin-left: auto; font-size: 10px; padding: 2px 7px; border-radius: var(--radius-pill); background: rgba(255,255,255,.16); color: rgba(255,255,255,.85); font-weight: 600; }
 .collapsed .item { justify-content: center; padding: 10px 0; }
 .collapsed .label, .collapsed .soon, .collapsed .brandText { display: none; }
-.userCard { border-top: 1px solid rgba(255,255,255,.12); padding: 12px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.userCard { border-top: 1px solid rgba(255,255,255,.12); padding: 14px 16px 14px 24px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .collapsed .userCard { justify-content: center; }
 .collapsed .userMeta, .collapsed .userCard .signout { display: none; }
 .userMeta { min-width: 0; flex: 1; line-height: 1.25; }
-.userMeta b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.userMeta b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 13px; overflow: hidden; line-height: 1.3; word-break: break-word; }
 .userMeta small { color: rgba(255,255,255,.65); font-size: 11px; }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .header { position: sticky; top: 0; z-index: 30; height: var(--header-height); display: flex; align-items: center; gap: 10px; padding: 0 var(--content-pad-x); background: var(--glass-bg); backdrop-filter: blur(14px) saturate(1.2); border-bottom: 1px solid var(--glass-border); }
@@ -56,9 +56,9 @@
   .collapsed .label, .collapsed .soon, .collapsed .brandText { display: revert; }
 }
 
-.sidebar .avatar { background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.3); }
-.sidebar .ghost-btn { color: rgba(255,255,255,.8); }
-.sidebar .ghost-btn:hover { background: rgba(255,255,255,.14); color: #fff; }
+.sidebar :global(.avatar) { background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.3); }
+.sidebar :global(.ghost-btn) { color: rgba(255,255,255,.8); }
+.sidebar :global(.ghost-btn):hover { background: rgba(255,255,255,.14); color: #fff; }
 :global(html.dark) .sidebar { background: var(--bg-secondary); border-right: 1px solid var(--border-light); box-shadow: none; color: var(--text-primary); }
 :global(html.dark) .item { color: var(--text-secondary); }
 :global(html.dark) .item:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -66,5 +66,12 @@
 :global(html.dark) .active::before { background: var(--accent-600); }
 :global(html.dark) .groupTitle, :global(html.dark) .brandText small, :global(html.dark) .userMeta small { color: var(--text-tertiary); }
 :global(html.dark) .brand, :global(html.dark) .userCard { border-color: var(--border-light); }
-:global(html.dark) .sidebar .avatar { background: var(--accent-50); color: var(--accent-600); border-color: var(--accent-100); }
-:global(html.dark) .sidebar .ghost-btn { color: var(--text-secondary); }
+:global(html.dark) .sidebar :global(.avatar) { background: var(--accent-50); color: var(--accent-600); border-color: var(--accent-100); }
+:global(html.dark) .sidebar :global(.ghost-btn) { color: var(--text-secondary); }
+
+.brandLogo { display: block; height: 48px; width: auto; max-width: 100%; object-fit: contain; }
+.collapsed .brandLogo { width: 32px; height: 32px; object-fit: cover; object-position: right center; }
+@media (max-width: 960px) { .collapsed .brandLogo { width: auto; height: 48px; object-fit: contain; } }
+
+.collapsed .userCard { padding: 14px 0; }
+.sidebar :global(.ghost-btn) { color: rgba(255,255,255,.85); }

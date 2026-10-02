@@ -5,6 +5,8 @@ import AppButton from '../components/common/AppButton'
 import Section from '../components/common/Section'
 import StatusChip from '../components/common/StatusChip'
 import PageHeader from '../components/PageHeader'
+import ProjectAiReview, { reviewProject } from '../components/ProjectAiReview'
+import ProjectDiscussion from '../components/ProjectDiscussion'
 import { ActionsMenu, DataTable, LookupModal, Modal, PickField, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
 import { consultants, developers, fmtDate, substations } from '../data/mock'
 import { consultantByProject, projects } from '../data/projects'
@@ -23,6 +25,8 @@ const detailsFor = (p: Project): Values => {
 }
 const required = ['ref', 'maalemNumber', 'maalemRef', 'name', 'areaMap', 'areaReport', 'subZone', 'engineer', 'developer', 'masterPlanStatus', 'siteSurveyor', 'corridors', 'ducts', 'category']
 const opts = { areaReport: ['Full', 'Partial', 'Not available', 'Pending'], zone: ['Zone 1', 'Zone 2', 'Zone 3'], masterPlanStatus: ['Approved', 'Under review', 'Draft'], corridors: ['Approved', 'Pending', 'Not required'], category: ['ASAP', 'Residential', 'Commercial', 'Mixed use', 'Industrial'] }
+
+const LABELS: Record<string, string> = { ref: 'REF', maalemNumber: 'Maalem number', maalemRef: 'Maalem ref', name: 'Project name', areaMap: 'Area map', areaReport: 'Area report', subZone: 'Sub-zone', engineer: 'Engineer', developer: 'Developer', masterPlanStatus: 'Master plan status', siteSurveyor: 'Site surveyor', corridors: '11kV corridors', ducts: '11kV ducts', category: 'Category' }
 
 type Picker = null | 'developer' | 'consultant'
 interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string }
@@ -58,7 +62,7 @@ export default function ProjectFormPage() {
     if (missing.size) { say('Please fill the required fields'); return }
     say('Project saved'); setTimeout(() => navigate('/projects'), 900)
   }
-  const tabs = isNew ? ['Project details'] : ['Project details', 'Substation', 'Remarks']
+  const tabs = isNew ? ['Project details'] : ['Project details', 'Substation', 'Remarks', 'AI review', 'Discussion & decisions']
 
   return (
     <div className="page">
@@ -155,6 +159,9 @@ export default function ProjectFormPage() {
             />
           </div>
         )}
+
+        {tab === 'AI review' && <ProjectAiReview run={() => reviewProject(v, required, LABELS)} />}
+        {tab === 'Discussion & decisions' && <ProjectDiscussion />}
       </div>
 
       {picker === 'developer' && <LookupModal title="Select developer" items={developers.map((d) => d.name)} onPick={(x) => set('developer', x)} onClose={() => setPicker(null)} />}
