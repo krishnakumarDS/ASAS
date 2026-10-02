@@ -67,7 +67,8 @@
 
   /* Form fields */
   --input-bg: #ffffff;
-  --input-border: #000000;
+  --input-border: #d4d4d4;
+  --input-border-hover: #a3a3a3;
   --backdrop: rgba(60, 64, 72, 0.32);
   color-scheme: light;
 }
@@ -107,6 +108,7 @@ html.dark {
 
   --input-bg: var(--bg-secondary);
   --input-border: var(--border-strong);
+  --input-border-hover: #6b6558;
   --backdrop: rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
