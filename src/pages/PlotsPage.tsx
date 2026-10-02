@@ -45,7 +45,8 @@ export default function PlotsPage() {
           <div className="row between wrap" style={{ padding: '10px 20px', background: 'var(--accent-50)', borderBottom: '1px solid var(--accent-100)' }} role="status">
             <b style={{ color: 'var(--accent-600)' }}>{selected.size} selected</b>
             <div className="row">
-              <AppButton variant="outlined" size="small" startIcon={<EyeOff size={15} />} onClick={() => { setRows(rows.map((r) => selected.has(r.id) ? { ...r, display: false } : r)); say('Selected plots disabled'); setSelected(new Set()) }}>Disable</AppButton>
+              <AppButton variant="outlined" size="small" startIcon={<Eye size={15} />} onClick={() => { setRows(rows.map((r) => selected.has(r.id) ? { ...r, display: true } : r)); say(`${selected.size} plot(s) enabled`); setSelected(new Set()) }}>Enable</AppButton>
+              <AppButton variant="outlined" size="small" startIcon={<EyeOff size={15} />} onClick={() => { setRows(rows.map((r) => selected.has(r.id) ? { ...r, display: false } : r)); say(`${selected.size} plot(s) disabled`); setSelected(new Set()) }}>Disable</AppButton>
               <AppButton variant="outlined" color="error" size="small" startIcon={<Trash2 size={15} />} onClick={() => setConfirm(true)}>Delete</AppButton>
             </div>
           </div>
@@ -59,7 +60,7 @@ export default function PlotsPage() {
             { header: 'DM plot', sort: sortFor('dm'), render: (r) => <span className="num">{r.dmPlot}</span> },
             { header: 'Developer', sort: sortFor('developer'), render: (r) => r.developer },
             { header: 'Consultant', sort: sortFor('consultant'), render: (r) => r.consultant || '—' },
-            { header: 'Smart Office', sort: sortFor('display'), render: (r) => <StatusChip status={r.display ? 'visible' : 'hidden'} /> },
+            { header: 'Smart Office', sort: sortFor('display'), render: (r) => <button type="button" title={r.display ? 'Click to disable' : 'Click to enable'} aria-label={`${r.display ? 'Disable' : 'Enable'} plot ${r.devPlot}`} onClick={() => { setRows(rows.map((x) => (x.id === r.id ? { ...x, display: !x.display } : x))); say(r.display ? 'Plot disabled' : 'Plot enabled') }}><StatusChip status={r.display ? 'visible' : 'hidden'} /></button> },
             { header: 'Actions', align: 'right', render: (r) => (
               <div className="row" style={{ justifyContent: 'flex-end', gap: 2 }}>
                 <IconButton small title="Edit" aria-label="Edit" onClick={() => navigate(`/plots/${r.id}`)}><Pencil size={17} /></IconButton>
