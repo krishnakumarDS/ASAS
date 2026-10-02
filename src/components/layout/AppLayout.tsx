@@ -44,7 +44,7 @@ export default function AppLayout() {
 
   return (
     <div className={styles.shell}>
-      <div className={styles.rail} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setHover(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHover(false) }}>
+      <div className={`${styles.rail} ${collapsed ? '' : styles.railOpen}`} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setHover(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHover(false) }}>
       <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''} ${open ? styles.open : ''}`} aria-label="Primary">
         <div className={styles.brand}>
           <img className={styles.brandLogo} src={DEWA_LOGO_WHITE} alt="Dubai Electricity & Water Authority" />

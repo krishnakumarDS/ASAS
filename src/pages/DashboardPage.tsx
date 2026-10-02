@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, BarChart3, CheckCircle2, FilePlus2, Plus, Send, Sparkles, Upload } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CheckCircle2, FilePlus2, Plus, Send, Sparkles, Upload } from 'lucide-react'
 import { openChat } from '../components/ai/AiChat'
 import AppButton from '../components/common/AppButton'
 import StatusChip from '../components/common/StatusChip'
@@ -87,9 +87,6 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <Link to="/projects" className={`${styles.alert} reveal-item`} style={{ ['--index' as string]: 0 }}>
-        <AlertTriangle size={18} /><span><b>{exceeding.length} submissions</b> are past their KPI date and need attention.</span><ArrowRight size={16} />
-      </Link>
 
       <div className={styles.kpis}>{d.kpis.map((k, i) => <Kpi key={k.label} k={k} i={i + 1} />)}</div>
 
