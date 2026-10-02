@@ -65,6 +65,9 @@
   --content-pad-y: clamp(16px, 2vw, 28px);
   --content-pad-x: clamp(12px, 2vw, 32px);
 
+  /* Form fields */
+  --input-bg: #ffffff;
+  --input-border: #000000;
   --backdrop: rgba(60, 64, 72, 0.32);
   color-scheme: light;
 }
@@ -102,6 +105,8 @@ html.dark {
   --shadow-lg: 0 20px 40px -12px rgba(0, 0, 0, 0.6);
   --shadow-xl: 0 28px 70px -24px rgba(0, 0, 0, 0.7);
 
+  --input-bg: var(--bg-secondary);
+  --input-border: var(--border-strong);
   --backdrop: rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }

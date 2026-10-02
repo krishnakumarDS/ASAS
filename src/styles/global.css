@@ -68,14 +68,14 @@ html.dark .liquid-btn { color: #04201b; }
 .field > label, .field > .label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .req { color: var(--color-danger); margin-left: 2px; }
 .input, .select, .textarea {
-  width: 100%; font-size: 14px; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-md);
-  background: var(--bg-primary); color: var(--text-primary); transition: all var(--transition-base); min-height: 40px;
+  width: 100%; font-size: 14px; padding: 10px 12px; border: 1px solid var(--input-border); border-radius: var(--radius-md);
+  background: var(--input-bg); color: var(--text-primary); transition: all var(--transition-base); min-height: 40px;
 }
 .input::placeholder, .textarea::placeholder { color: var(--text-tertiary); }
-.input:hover:not(:disabled):not(:read-only), .select:hover:not(:disabled), .textarea:hover { border-color: var(--border-medium); background: var(--bg-secondary); }
-.input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--accent-600); background: var(--accent-50); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-600) 15%, transparent); }
-.input:disabled, .select:disabled, .textarea:disabled { background: var(--bg-tertiary); color: var(--text-tertiary); cursor: not-allowed; }
-.input:read-only:not(:disabled) { background: var(--bg-tertiary); }
+.input:hover:not(:disabled), .select:hover:not(:disabled), .textarea:hover:not(:disabled) { box-shadow: 0 0 0 1px var(--input-border); }
+.input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--accent-600); background: var(--input-bg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-600) 22%, transparent); }
+.input:disabled, .select:disabled, .textarea:disabled { background: var(--bg-tertiary); color: var(--text-tertiary); border-color: var(--border-medium); cursor: not-allowed; }
+.input:read-only:not(:disabled) { border-color: var(--border-strong); }
 .input.invalid, .select.invalid, .textarea.invalid { border-color: var(--color-danger); }
 .textarea { min-height: 88px; resize: vertical; line-height: 1.5; }
 .select { appearance: none; padding-right: 36px; background-repeat: no-repeat; background-position: right 8px center; background-size: 20px;
@@ -85,8 +85,8 @@ html.dark .liquid-btn { color: #04201b; }
 .with-action { display: flex; gap: 8px; }
 .with-action .input { flex: 1; }
 .radio-group { display: flex; gap: 8px; }
-.radio { flex: 1; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-primary); cursor: pointer; font-size: 14px; transition: all var(--transition-base); }
-.radio:hover { border-color: var(--border-medium); }
+.radio { flex: 1; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border: 1px solid var(--input-border); border-radius: var(--radius-md); background: var(--input-bg); cursor: pointer; font-size: 14px; transition: all var(--transition-base); }
+.radio:hover { box-shadow: 0 0 0 1px var(--input-border); }
 .radio:has(input:checked) { border-color: var(--accent-600); background: var(--accent-50); color: var(--accent-600); font-weight: 600; }
 .radio:has(input:disabled) { opacity: 0.7; cursor: not-allowed; }
 .radio input { accent-color: var(--accent-600); }
@@ -213,7 +213,7 @@ button.party { text-align: left; display: block; width: 100%; cursor: pointer; }
 .report-ico { width: 44px; height: 44px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--tone); background: color-mix(in srgb, var(--tone) 12%, transparent); flex-shrink: 0; }
 
 .ai-input { position: relative; display: flex; align-items: center; gap: 8px; }
-.ai-input .input { padding-left: 42px; min-height: 46px; font-size: 15px; border-radius: var(--radius-lg); background: var(--bg-primary); }
+.ai-input .input { padding-left: 42px; min-height: 46px; font-size: 15px; border-radius: var(--radius-lg); }
 .ai-ico { position: absolute; left: 14px; color: var(--accent-600); pointer-events: none; }
 .ai-input .ghost-btn { position: absolute; right: 6px; }
 
