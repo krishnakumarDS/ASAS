@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Send, Sparkles, X } from 'lucide-react'
 import IconButton from '../common/IconButton'
 import { exceeding, engineers } from '../../data/dashboard'
-import { developers, plots, substations } from '../../data/mock'
-import { consultantByProject, projects } from '../../data/projects'
+import { snapshot } from '../../data/store'
 import styles from './AiChat.module.css'
 
 export const OPEN_CHAT = 'asas:open-chat'
@@ -16,6 +15,7 @@ const has = (s: string, ...w: string[]) => w.some((x) => s.includes(x))
 /** Answers from the app's own sample data with simple rules. Swap `reply` for a call to the real AI service when it is connected. */
 function reply(raw: string): string {
   const q = raw.toLowerCase()
+  const projects = snapshot.projects(), developers = snapshot.developers(), plots = snapshot.plots(), substations = snapshot.substations()
   if (has(q, 'exceed', 'late', 'overdue', 'kpi')) return `${exceeding.length} submissions are exceeding KPI:\n` + exceeding.map((e) => `• ${e.project} — ${e.engineer}, +${e.over}d`).join('\n')
   if (has(q, 'workload', 'capacity', 'engineer', 'available')) {
     const t = [...engineers].map((e) => ({ n: e.name, v: e.parts.reduce((a, b) => a + b, 0) })).sort((a, b) => a.v - b.v)
@@ -24,7 +24,7 @@ function reply(raw: string): string {
   const dev = developers.find((d) => q.includes(d.name.toLowerCase().split(' (')[0]))
   if (dev) { const ps = projects.filter((p) => p.developer.toLowerCase().includes(dev.name.toLowerCase().split(' (')[0])); return `${dev.name} has ${ps.length} project(s)${ps.length ? ':\n' + ps.map((p) => `• ${p.name} (${p.maalemRef})`).join('\n') : '.'}` }
   const pr = projects.find((p) => q.includes(p.name.toLowerCase()) || q.includes(p.maalemRef.toLowerCase()))
-  if (pr) return `${pr.name} (${pr.maalemRef})\nDeveloper: ${pr.developer}\nConsultant: ${consultantByProject[pr.id] ?? '—'}\nDisplay: ${pr.display ? 'visible' : 'hidden'}\nPlots: ${plots.filter((p) => p.maalemRef === pr.maalemRef).length}`
+  if (pr) return `${pr.name} (${pr.maalemRef})\nDeveloper: ${pr.developer}\nConsultant: ${pr.consultant || '—'}\nDisplay: ${pr.display ? 'visible' : 'hidden'}\nPlots: ${plots.filter((p) => p.maalemRef === pr.maalemRef).length}`
   if (has(q, 'substation')) { const d = substations.filter((s) => s.builtBy === 'DEWA').length; return `There are ${substations.length} substations: ${d} built by DEWA and ${substations.length - d} by developers.` }
   if (has(q, 'plot')) return `There are ${plots.length} plots across ${new Set(plots.map((p) => p.maalemRef)).size} projects; ${plots.filter((p) => !p.consultant).length} have no consultant.`
   if (has(q, 'project')) return `There are ${projects.length} projects; ${projects.filter((p) => p.display).length} visible and ${projects.filter((p) => !p.display).length} hidden.`

@@ -4,11 +4,12 @@ import { Sparkles } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import PageHeader from '../components/PageHeader'
 import { LookupModal, PickField } from '../components/ui'
-import { projects } from '../data/projects'
+import { useProjects } from '../data/store'
 
 /** Add a single plot: choose the project (Maalem Dubai reference), then fill the plot form. Bulk loads use "AI upload" on the Plots list. */
 export default function PlotWizardPage() {
   const navigate = useNavigate()
+  const [projects] = useProjects()
   const [project, setProject] = useState('')
   const [lookup, setLookup] = useState(false)
   return (

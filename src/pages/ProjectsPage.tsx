@@ -9,21 +9,21 @@ import StatusChip from '../components/common/StatusChip'
 import PageHeader from '../components/PageHeader'
 import { AiSearchBar, AppInput, DataTable, Pager, matchQuery, usePaged, useSort, useToast } from '../components/ui'
 import { fmtDate } from '../data/mock'
-import { consultantByProject, projects as seed } from '../data/projects'
+import { newId, useProjects } from '../data/store'
 import type { Project } from '../data/projects'
 
 const SUGGEST = ['hidden projects', 'Al Wasl', 'Dubai Properties Group', 'visible']
 
 export default function ProjectsPage() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState<Project[]>(seed)
+  const [rows, setRows] = useProjects()
   const [q, setQ] = useState('')
   const [dev, setDev] = useState('')
   const [cons, setCons] = useState('')
   const [toDelete, setToDelete] = useState<Project | null>(null)
   const [upload, setUpload] = useState(false)
   const [toast, say] = useToast()
-  const consultantOf = (p: Project) => consultantByProject[p.id] ?? ''
+  const consultantOf = (p: Project) => p.consultant ?? ''
 
   const filtered = useMemo(() => rows.filter((p) =>
     matchQuery(`${p.name} ${p.maalemRef} ${p.developer} ${consultantOf(p)} ${p.createdBy} ${p.display ? 'visible' : 'hidden'}`, q)
@@ -70,7 +70,7 @@ export default function ProjectsPage() {
       <ConfirmationDialog open={!!toDelete} title="Delete project" message={`Delete “${toDelete?.name}”? This can’t be undone.`} confirmLabel="Delete" destructive
         onConfirm={() => toDelete && setRows((r) => r.filter((x) => x.id !== toDelete.id))} onClose={() => setToDelete(null)} />
       {upload && <AiUpload entity="Projects" fields={FIELDS.projects} onClose={() => setUpload(false)} onImport={(imp) => {
-        setRows((r) => [...imp.map((o, i): Project => ({ id: `u${Date.now()}${i}`, maalemRef: o.maalemRef, name: o.name, developer: o.developer ?? '', createdBy: 'AI upload', createdOn: new Date().toISOString(), display: false })), ...r])
+        setRows((r) => [...imp.map((o): Project => ({ id: newId(), maalemRef: o.maalemRef, name: o.name, developer: o.developer ?? '', createdBy: 'AI upload', createdOn: new Date().toISOString(), display: false })), ...r])
         say(`${imp.length} projects imported`)
       }} />}
       {toast}

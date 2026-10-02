@@ -8,8 +8,10 @@ import PageHeader from '../components/PageHeader'
 import ProjectAiReview, { reviewProject } from '../components/ProjectAiReview'
 import ProjectDiscussion from '../components/ProjectDiscussion'
 import { ActionsMenu, DataTable, LookupModal, Modal, PickField, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
-import { consultants, developers, fmtDate, substations } from '../data/mock'
-import { consultantByProject, projects } from '../data/projects'
+import { fmtDate } from '../data/mock'
+import type { Substation } from '../data/mock'
+import { newId, setStored, useConsultants, useDevelopers, usePersistent, useProjects, useSubstations } from '../data/store'
+import { useAuth } from '../context/AuthContext'
 import type { Project } from '../data/projects'
 
 type Values = Record<string, string>
@@ -21,12 +23,16 @@ const emptyValues: Values = {
 const detailsFor = (p: Project): Values => {
   const [a, b, c] = p.maalemRef.split('-')
   return { ...emptyValues, ref: c, maalemNumber: `${a}-${b}`, maalemRef: p.maalemRef, name: p.name, areaMap: 'Yes', areaMapRef: `17-${p.maalemRef}-${p.name.toUpperCase().slice(0, 8)}`, areaReport: 'Full', subZone: 'B_E',
-    engineer: 'LBN', assistantEngineer: 'SRN', developer: p.developer, consultant: consultantByProject[p.id] ?? '', masterPlanStatus: 'Approved', siteSurveyor: 'Yes', corridors: 'Approved', ducts: 'Approved', ss132: '1', category: 'ASAP' }
+    engineer: 'LBN', assistantEngineer: 'SRN', developer: p.developer, consultant: p.consultant ?? '', masterPlanStatus: 'Approved', siteSurveyor: 'Yes', corridors: 'Approved', ducts: 'Approved', ss132: '1', category: 'ASAP' }
 }
 const required = ['ref', 'maalemNumber', 'maalemRef', 'name', 'areaMap', 'areaReport', 'subZone', 'engineer', 'developer', 'masterPlanStatus', 'siteSurveyor', 'corridors', 'ducts', 'category']
 const opts = { areaReport: ['Full', 'Partial', 'Not available', 'Pending'], zone: ['Zone 1', 'Zone 2', 'Zone 3'], masterPlanStatus: ['Approved', 'Under review', 'Draft'], corridors: ['Approved', 'Pending', 'Not required'], category: ['ASAP', 'Residential', 'Commercial', 'Mixed use', 'Industrial'] }
 
 const LABELS: Record<string, string> = { ref: 'REF', maalemNumber: 'Maalem number', maalemRef: 'Maalem ref', name: 'Project name', areaMap: 'Area map', areaReport: 'Area report', subZone: 'Sub-zone', engineer: 'Engineer', developer: 'Developer', masterPlanStatus: 'Master plan status', siteSurveyor: 'Site surveyor', corridors: '11kV corridors', ducts: '11kV ducts', category: 'Category' }
+
+const SEED_EXISTING: SubRow[] = [{ id: 's1', name: 'Towers of Kifaf', status: 'Developer', createdOn: '2025-11-13T08:19:45', createdBy: 'Mariam Mohamed Alhosani', active: true, scada: 'TWRKIFAF' }]
+const NO_SUBS: SubRow[] = []
+const NO_REMARKS: Remark[] = []
 
 type Picker = null | 'developer' | 'consultant'
 interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string }
@@ -35,18 +41,24 @@ interface Remark { id: string; text: string; createdBy: string; createdOn: strin
 export default function ProjectFormPage() {
   const { id = 'new' } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const [projects, setProjects] = useProjects()
+  const [devs] = useDevelopers()
+  const [cons] = useConsultants()
+  const [allSubs] = useSubstations()
   const project = projects.find((p) => p.id === id)
+  const [saved] = usePersistent<Values | null>(`project:${id}:details`, null)
   const isNew = id === 'new'
-  const [v, setV] = useState<Values>(isNew || !project ? emptyValues : detailsFor(project))
+  const [v, setV] = useState<Values>(isNew || !project ? emptyValues : (saved ?? detailsFor(project)))
   const [editable, setEditable] = useState(isNew)
   const [errors, setErrors] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState('Project details')
   const [picker, setPicker] = useState<Picker>(null)
   const [toast, say] = useToast()
-  const [existing, setExisting] = useState<SubRow[]>(!isNew ? [{ id: 's1', name: 'Towers of Kifaf', status: 'Developer', createdOn: '2025-11-13T08:19:45', createdBy: 'Mariam Mohamed Alhosani', active: true, scada: 'TWRKIFAF' }] : [])
-  const [future, setFuture] = useState<SubRow[]>([])
+  const [existing, setExisting] = usePersistent<SubRow[]>(`project:${id}:existing`, /^\d+$/.test(id) ? SEED_EXISTING : NO_SUBS)
+  const [future, setFuture] = usePersistent<SubRow[]>(`project:${id}:future`, NO_SUBS)
   const [subModal, setSubModal] = useState<null | 'existing' | 'future'>(null)
-  const [remarks, setRemarks] = useState<Remark[]>([])
+  const [remarks, setRemarks] = usePersistent<Remark[]>(`project:${id}:remarks`, NO_REMARKS)
   const [remarkModal, setRemarkModal] = useState(false)
 
   const ro = !editable
@@ -60,7 +72,16 @@ export default function ProjectFormPage() {
     const missing = new Set(required.filter((k) => !v[k].trim()))
     setErrors(missing)
     if (missing.size) { say('Please fill the required fields'); return }
-    say('Project saved'); setTimeout(() => navigate('/projects'), 900)
+    const row = { maalemRef: v.maalemRef, name: v.name, developer: v.developer, consultant: v.consultant }
+    if (isNew) {
+      const nid = newId()
+      setProjects((l) => [{ id: nid, ...row, createdBy: user?.name ?? 'Unknown', createdOn: new Date().toISOString(), display: false }, ...l])
+      setStored(`project:${nid}:details`, v)
+    } else {
+      setProjects((l) => l.map((p) => (p.id === id ? { ...p, ...row } : p)))
+      setStored(`project:${id}:details`, v)
+    }
+    say('Project saved'); setTimeout(() => navigate('/projects'), 700)
   }
   const tabs = isNew ? ['Project details'] : ['Project details', 'Substation', 'Remarks', 'AI review', 'Discussion & decisions']
 
@@ -161,43 +182,45 @@ export default function ProjectFormPage() {
         )}
 
         {tab === 'AI review' && <ProjectAiReview run={() => reviewProject(v, required, LABELS)} />}
-        {tab === 'Discussion & decisions' && <ProjectDiscussion />}
+        {tab === 'Discussion & decisions' && <ProjectDiscussion projectId={id} />}
       </div>
 
-      {picker === 'developer' && <LookupModal title="Select developer" items={developers.map((d) => d.name)} onPick={(x) => set('developer', x)} onClose={() => setPicker(null)} />}
-      {picker === 'consultant' && <LookupModal title="Select consultant" items={consultants.map((d) => d.name)} onPick={(x) => set('consultant', x)} onClose={() => setPicker(null)} />}
-      {subModal && <SubstationModal future={subModal === 'future'} onClose={() => setSubModal(null)} onSave={(r) => { (subModal === 'future' ? setFuture : setExisting)((p) => [...p, r]); setSubModal(null); say('Substation added') }} />}
+      {picker === 'developer' && <LookupModal title="Select developer" items={devs.map((d) => d.name)} onPick={(x) => set('developer', x)} onClose={() => setPicker(null)} />}
+      {picker === 'consultant' && <LookupModal title="Select consultant" items={cons.map((d) => d.name)} onPick={(x) => set('consultant', x)} onClose={() => setPicker(null)} />}
+      {subModal && <SubstationModal all={allSubs} future={subModal === 'future'} onClose={() => setSubModal(null)} onSave={(r) => { (subModal === 'future' ? setFuture : setExisting)((p) => [...p, r]); setSubModal(null); say('Substation added') }} />}
       {remarkModal && <RemarkModal onClose={() => setRemarkModal(false)} onSave={(r) => { setRemarks((p) => [...p, r]); setRemarkModal(false); say('Remark added') }} />}
       {toast}
     </div>
   )
 }
 
-function SubstationModal({ future, onClose, onSave }: { future: boolean; onClose: () => void; onSave: (r: SubRow) => void }) {
+function SubstationModal({ all, future, onClose, onSave }: { all: Substation[]; future: boolean; onClose: () => void; onSave: (r: SubRow) => void }) {
+  const { user } = useAuth()
   const [name, setName] = useState('')
   const [commissioning, setCommissioning] = useState('')
-  const sub = substations.find((s) => s.name === name)
+  const sub = all.find((s) => s.name === name)
   return (
     <Modal title={future ? 'Add future substation' : 'Add existing substation'} size="sm" onClose={onClose} footer={
       <>
         <AppButton variant="outlined" onClick={onClose}>Cancel</AppButton>
-        <AppButton variant="contained" disabled={!name} onClick={() => onSave({ id: String(Date.now()), name, status: sub?.builtBy ?? '', createdOn: new Date().toISOString(), createdBy: 'venkat reddy', active: true, scada: sub?.scada ?? '', commissioning })}>Save</AppButton>
+        <AppButton variant="contained" disabled={!name} onClick={() => onSave({ id: newId(), name, status: sub?.builtBy ?? '', createdOn: new Date().toISOString(), createdBy: user?.name ?? 'Unknown', active: true, scada: sub?.scada ?? '', commissioning })}>Save</AppButton>
       </>
     }>
-      <SelectField label="Substation" required value={name} options={substations.map((s) => s.name)} onChange={setName} />
+      <SelectField label="Substation" required value={name} options={all.map((s) => s.name)} onChange={setName} />
       {future && <TextField label="Commissioning date" type="date" value={commissioning} onChange={setCommissioning} />}
     </Modal>
   )
 }
 
 function RemarkModal({ onClose, onSave }: { onClose: () => void; onSave: (r: Remark) => void }) {
+  const { user } = useAuth()
   const [text, setText] = useState('')
   const [active, setActive] = useState('true')
   return (
     <Modal title="Project remarks" size="sm" onClose={onClose} footer={
       <>
         <AppButton variant="outlined" onClick={onClose}>Cancel</AppButton>
-        <AppButton variant="contained" disabled={!text.trim()} onClick={() => onSave({ id: String(Date.now()), text, createdBy: 'venkat reddy', createdOn: new Date().toISOString(), active: active === 'true' })}>Save</AppButton>
+        <AppButton variant="contained" disabled={!text.trim()} onClick={() => onSave({ id: newId(), text, createdBy: user?.name ?? 'Unknown', createdOn: new Date().toISOString(), active: active === 'true' })}>Save</AppButton>
       </>
     }>
       <TextField label="Remark log" required multiline value={text} onChange={setText} />

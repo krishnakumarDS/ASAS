@@ -5,13 +5,14 @@ import AppButton from '../components/common/AppButton'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/PageHeader'
 import { AiSearchBar, matchQuery } from '../components/ui'
-import { consultants, developers, fmtDate } from '../data/mock'
-import { consultantByProject, projects } from '../data/projects'
+import { fmtDate } from '../data/mock'
+import type { Party } from '../data/mock'
+import { useConsultants, useDevelopers, useProjects } from '../data/store'
 
 export type Kind = 'consultant' | 'developer'
 export const kindMeta = {
-  consultant: { title: 'Consultants', one: 'Consultant', path: '/consultants', data: consultants, sub: 'Consultant directory and linked projects' },
-  developer: { title: 'Developers', one: 'Developer', path: '/developers', data: developers, sub: 'Developer profiles and their portfolios' },
+  consultant: { title: 'Consultants', one: 'Consultant', path: '/consultants', sub: 'Consultant directory and linked projects' },
+  developer: { title: 'Developers', one: 'Developer', path: '/developers', sub: 'Developer profiles and their portfolios' },
 }
 const initials = (n: string) => n.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
 type SortKey = 'name' | 'projects' | 'created'
@@ -19,21 +20,25 @@ type SortKey = 'name' | 'projects' | 'created'
 export default function PartiesListPage({ kind }: { kind: Kind }) {
   const m = kindMeta[kind]
   const navigate = useNavigate()
+  const [devs] = useDevelopers()
+  const [cons] = useConsultants()
+  const [projects] = useProjects()
+  const data: Party[] = kind === 'developer' ? devs : cons
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<SortKey>('name')
   const [asc, setAsc] = useState(true)
-  const count = (name: string) => projects.filter((p) => (kind === 'consultant' ? consultantByProject[p.id] === name : p.developer.split(' (')[0] === name.split(' (')[0])).length
+  const count = (name: string) => projects.filter((p) => (kind === 'consultant' ? p.consultant === name : p.developer.split(' (')[0] === name.split(' (')[0])).length
   const rows = useMemo(() => {
-    const f = m.data.filter((r) => matchQuery(`${r.name} ${r.createdBy}`, q))
+    const f = data.filter((r) => matchQuery(`${r.name} ${r.createdBy}`, q))
     const val = (r: (typeof f)[number]) => (sort === 'name' ? r.name : sort === 'created' ? r.createdOn : count(r.name))
     return [...f].sort((a, b) => { const x = val(a), y = val(b); const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y)); return asc ? c : -c })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [m, q, sort, asc])
+  }, [data, projects, q, sort, asc])
 
   return (
     <div className="page">
       <PageHeader title={m.title} subtitle={m.sub} back={false} actions={<AppButton variant="contained" startIcon={<Plus size={17} />} onClick={() => navigate(`${m.path}/new`)}>Add {m.one.toLowerCase()}</AppButton>} />
-      <AiSearchBar value={q} onChange={setQ} placeholder={`Ask in plain words — e.g. “${kind === 'developer' ? 'developers with Dubai in the name' : 'consultants added by Mariam'}”`} suggestions={kind === 'developer' ? ['Dubai', 'Meraas', 'Al Wasl'] : ['AECOM', 'Engineering', 'Mariam']} resultText={`${rows.length} of ${m.data.length} ${m.title.toLowerCase()}`} />
+      <AiSearchBar value={q} onChange={setQ} placeholder={`Ask in plain words — e.g. “${kind === 'developer' ? 'developers with Dubai in the name' : 'consultants added by Mariam'}”`} suggestions={kind === 'developer' ? ['Dubai', 'Meraas', 'Al Wasl'] : ['AECOM', 'Engineering', 'Mariam']} resultText={`${rows.length} of ${data.length} ${m.title.toLowerCase()}`} />
       <div className="row wrap" style={{ gap: 8, marginBottom: 14 }}>
         <span className="eyebrow">Sort by</span>
         {([['name', 'Name'], ['projects', 'Linked projects'], ['created', 'Date added']] as [SortKey, string][]).map(([k, l]) => (

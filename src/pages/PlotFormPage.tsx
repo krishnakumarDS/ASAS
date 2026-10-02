@@ -5,8 +5,7 @@ import AppButton from '../components/common/AppButton'
 import Section from '../components/common/Section'
 import PageHeader from '../components/PageHeader'
 import { LookupModal, PickField, RadioField, TextField, useToast } from '../components/ui'
-import { consultants, plots, substations } from '../data/mock'
-import { projects } from '../data/projects'
+import { newId, setStored, useConsultants, usePersistent, usePlots, useProjects, useSubstations } from '../data/store'
 
 type V = Record<string, string>
 const loads = ['dataCenter', 'solar', 'industrial', 'lighting', 'evCharger', 'agritech', 'other']
@@ -16,10 +15,15 @@ export default function PlotFormPage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const navigate = useNavigate()
+  const [plots, setPlots] = usePlots()
+  const [projects] = useProjects()
+  const [consultants] = useConsultants()
+  const [substations] = useSubstations()
+  const [saved] = usePersistent<V | null>(`plot:${id ?? 'new'}:details`, null)
   const plot = plots.find((p) => p.id === id)
   const ref = plot?.maalemRef ?? params.get('ref') ?? ''
   const project = projects.find((p) => p.maalemRef === ref)
-  const [v, setV] = useState<V>({
+  const [v, setV] = useState<V>(saved ?? {
     show: plot ? (plot.display ? 'Yes' : 'No') : '', maalemRef: ref, consultant: plot?.consultant ?? '', devPlot: plot?.devPlot ?? '', dmPlot: plot?.dmPlot ?? '',
     owner: '', status: '', noc: '', initSub: '', ultSub: '', projectName: plot?.projectName ?? project?.name ?? '', developer: plot?.developer ?? project?.developer ?? '',
     powerDensity: '', gfa: '', landUse: '', expPower: '', generalLoad: '', cooling: '', dcp: '', tcl: '', initDate: '', ultDate: '',
@@ -31,7 +35,14 @@ export default function PlotFormPage() {
   const set = (k: string) => (x: string) => setV((p) => ({ ...p, [k]: x }))
   const t = (k: string, label: string, o: { required?: boolean; type?: string; readOnly?: boolean } = {}) =>
     <TextField label={label} value={v[k]} onChange={set(k)} type={o.type} readOnly={o.readOnly} required={o.required} error={submitted && o.required && !v[k] ? 'This field is required' : undefined} />
-  const save = () => { setSubmitted(true); if (!v.show || !v.devPlot) return; say('Plot saved'); setTimeout(() => navigate('/plots'), 900) }
+  const save = () => {
+    setSubmitted(true)
+    if (!v.show || !v.devPlot) return
+    const row = { maalemRef: v.maalemRef, projectName: v.projectName, devPlot: v.devPlot, dmPlot: v.dmPlot, developer: v.developer, consultant: v.consultant, display: v.show === 'Yes' }
+    if (plot) { setPlots((l) => l.map((p) => (p.id === plot.id ? { ...p, ...row } : p))); setStored(`plot:${plot.id}:details`, v) }
+    else { const nid = newId(); setPlots((l) => [{ id: nid, ...row }, ...l]); setStored(`plot:${nid}:details`, v) }
+    say('Plot saved'); setTimeout(() => navigate('/plots'), 700)
+  }
 
   return (
     <div className="page">

@@ -7,38 +7,71 @@ import PageHeader from '../components/PageHeader'
 import StatusChip from '../components/common/StatusChip'
 import { ActionsMenu, DataTable, Modal, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
 import { fmtDate } from '../data/mock'
-import { consultantByProject, projects } from '../data/projects'
+import type { Party } from '../data/mock'
+import { newId, setStored, useConsultants, useDevelopers, usePersistent, useProjects } from '../data/store'
+import { useAuth } from '../context/AuthContext'
 import { kindMeta } from './PartiesListPage'
 import type { Kind } from './PartiesListPage'
 
 interface Issue { id: string; ref: string; project: string; description: string; createdBy: string; createdOn: string; showInSO: boolean }
+
+const NO_ISSUES: Issue[] = []
 
 export default function PartyDetailPage({ kind }: { kind: Kind }) {
   const m = kindMeta[kind]
   const other = kind === 'consultant' ? 'Developers' : 'Consultants'
   const { id = 'new' } = useParams()
   const navigate = useNavigate()
-  const party = m.data.find((p) => p.id === id)
+  const { user } = useAuth()
+  const [projects] = useProjects()
+  const [devs, setDevs] = useDevelopers()
+  const [cons, setCons] = useConsultants()
+  const list: Party[] = kind === 'developer' ? devs : cons
+  const setList = kind === 'developer' ? setDevs : setCons
+  const party = list.find((p) => p.id === id)
   const isNew = !party
   const [edit, setEdit] = useState(isNew)
   const [name, setName] = useState(party?.name ?? '')
   const [url, setUrl] = useState(party?.url ?? '')
   const [show, setShow] = useState(party ? (party.showInSO ? 'Yes' : 'No') : '')
-  const [image, setImage] = useState<File | null>(null)
+  const [savedImage] = usePersistent<string>(`party:${kind}:${id}:image`, '')
+  const [pendingImage, setPendingImage] = useState<string | null>(null)
+  const image = pendingImage ?? savedImage
+  const pickImage = (f?: File) => {
+    if (!f) return
+    if (f.size > 400_000) { say('Image is too large — use one under 400 KB'); return }
+    const r = new FileReader()
+    r.onload = () => setPendingImage(String(r.result))
+    r.readAsDataURL(f)
+  }
   const [tab, setTab] = useState('Main details')
   const [submitted, setSubmitted] = useState(false)
-  const [issues, setIssues] = useState<Issue[]>([])
+  const [issues, setIssues] = usePersistent<Issue[]>(`party:${kind}:${id}:issues`, NO_ISSUES)
   const [issueModal, setIssueModal] = useState(false)
   const [fRef, setFRef] = useState('')
   const [fName, setFName] = useState('')
   const [fBy, setFBy] = useState('')
   const [toast, say] = useToast()
 
-  const related = projects.filter((p) => (kind === 'consultant' ? consultantByProject[p.id] === name : p.developer.split(' (')[0] === name.split(' (')[0] || p.developer === name))
-  const others = [...new Set(related.map((p) => (kind === 'consultant' ? p.developer : consultantByProject[p.id])).filter(Boolean))]
+  const related = projects.filter((p) => (kind === 'consultant' ? p.consultant === name : p.developer.split(' (')[0] === name.split(' (')[0] || p.developer === name))
+  const others = [...new Set(related.map((p) => (kind === 'consultant' ? p.developer : p.consultant)).filter(Boolean))]
   const tabs = isNew ? ['Main details'] : edit ? ['Main details', 'Issues'] : ['Main details', 'Issues', 'Projects', other]
   const match = (a: string, b: string) => a.toLowerCase().includes(b.toLowerCase())
-  const save = () => { setSubmitted(true); if (!name.trim()) return; say(`${m.one} saved`); setTimeout(() => (isNew ? navigate(m.path) : setEdit(false)), 800) }
+  const save = () => {
+    setSubmitted(true)
+    if (!name.trim()) return
+    if (isNew) {
+      const nid = newId()
+      setList((l) => [{ id: nid, name: name.trim(), createdBy: user?.name ?? 'Unknown', createdOn: new Date().toISOString(), url, showInSO: show === 'Yes' }, ...l])
+      if (pendingImage) setStored(`party:${kind}:${nid}:image`, pendingImage)
+    } else {
+      setList((l) => l.map((x) => (x.id === id ? { ...x, name: name.trim(), url, showInSO: show === 'Yes' } : x)))
+      if (pendingImage) setStored(`party:${kind}:${id}:image`, pendingImage)
+      setPendingImage(null)
+    }
+    say(`${m.one} saved`)
+    setTimeout(() => (isNew ? navigate(m.path) : setEdit(false)), 700)
+  }
   const initials = name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
 
   return (
@@ -78,8 +111,8 @@ export default function PartyDetailPage({ kind }: { kind: Kind }) {
             <Section title="Profile">
               <div className="row wrap" style={{ gap: 24, alignItems: 'flex-start' }}>
                 <div style={{ width: 140 }}>
-                  <div className="avatar lg" style={{ width: 140, height: 120, borderStyle: 'dashed', borderRadius: 'var(--radius-lg)' }}>{image ? <span style={{ fontSize: 12, padding: 8, textAlign: 'center' }}>{image.name}</span> : <span className="muted" style={{ textAlign: 'center', fontSize: 12 }}><ImageIcon size={26} /><br />No image</span>}</div>
-                  {edit && <AppButton component="label" variant="outlined" fullWidth size="small" startIcon={<Upload size={14} />} style={{ marginTop: 10 }}>Upload<input type="file" accept="image/*" hidden onChange={(e) => setImage(e.target.files?.[0] ?? null)} /></AppButton>}
+                  <div className="avatar lg" style={{ width: 140, height: 120, borderStyle: 'dashed', borderRadius: 'var(--radius-lg)' }}>{image ? <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} /> : <span className="muted" style={{ textAlign: 'center', fontSize: 12 }}><ImageIcon size={26} /><br />No image</span>}</div>
+                  {edit && <AppButton component="label" variant="outlined" fullWidth size="small" startIcon={<Upload size={14} />} style={{ marginTop: 10 }}>Upload<input type="file" accept="image/*" hidden onChange={(e) => pickImage(e.target.files?.[0])} /></AppButton>}
                 </div>
                 <div className="grow" style={{ minWidth: 260 }}>
                   <TextField label="Name" required value={name} readOnly={!edit} onChange={setName} error={submitted && !name.trim() ? 'This field is required' : undefined} />
@@ -126,7 +159,7 @@ export default function PartyDetailPage({ kind }: { kind: Kind }) {
               rows={related} empty="No linked projects."
               columns={[
                 { header: 'Project', render: (r) => <><a href="#" className="link cell-title" onClick={(e) => { e.preventDefault(); navigate(`/projects/${r.id}`) }}>{r.name}</a><div className="cell-sub num">{r.maalemRef}</div></> },
-                { header: kind === 'consultant' ? 'Developer' : 'Consultant', render: (r) => (kind === 'consultant' ? r.developer : consultantByProject[r.id]) || '—' },
+                { header: kind === 'consultant' ? 'Developer' : 'Consultant', render: (r) => (kind === 'consultant' ? r.developer : r.consultant) || '—' },
                 { header: 'Created', render: (r) => <><div>{r.createdBy}</div><div className="cell-sub">{fmtDate(r.createdOn)}</div></> },
                 { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Open project', onClick: () => navigate(`/projects/${r.id}`) }]} /> },
               ]}
@@ -146,13 +179,14 @@ export default function PartyDetailPage({ kind }: { kind: Kind }) {
         )}
       </div>
 
-      {issueModal && <IssueModal refs={related.map((p) => p.maalemRef)} onClose={() => setIssueModal(false)} onSave={(i) => { const p = projects.find((x) => x.maalemRef === i.ref); setIssues((prev) => [...prev, { ...i, project: p?.name ?? '' }]); setIssueModal(false); say('Issue added') }} />}
+      {issueModal && <IssueModal refs={related.map((p) => p.maalemRef)} onClose={() => setIssueModal(false)} onSave={(i) => { const p = projects.find((x) => x.maalemRef === i.ref); setIssues((prev) => [...prev, { ...i, id: newId(), project: p?.name ?? '' }]); setIssueModal(false); say('Issue added') }} />}
       {toast}
     </div>
   )
 }
 
 function IssueModal({ refs, onClose, onSave }: { refs: string[]; onClose: () => void; onSave: (i: Issue) => void }) {
+  const { user } = useAuth()
   const [ref, setRef] = useState('')
   const [desc, setDesc] = useState('')
   const [show, setShow] = useState('')
@@ -160,7 +194,7 @@ function IssueModal({ refs, onClose, onSave }: { refs: string[]; onClose: () => 
     <Modal title="Add issue" size="sm" onClose={onClose} footer={
       <>
         <AppButton variant="outlined" onClick={onClose}>Cancel</AppButton>
-        <AppButton variant="contained" disabled={!desc.trim() || !show} onClick={() => onSave({ id: String(Date.now()), ref, project: '', description: desc, createdBy: 'venkat reddy', createdOn: new Date().toISOString(), showInSO: show === 'Yes' })}>Save</AppButton>
+        <AppButton variant="contained" disabled={!desc.trim() || !show} onClick={() => onSave({ id: String(Date.now()), ref, project: '', description: desc, createdBy: user?.name ?? 'Unknown', createdOn: new Date().toISOString(), showInSO: show === 'Yes' })}>Save</AppButton>
       </>
     }>
       <SelectField label="Maalem Dubai ref" value={ref} options={refs} onChange={setRef} />

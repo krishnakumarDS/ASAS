@@ -7,14 +7,21 @@ import EmptyState from '../components/common/EmptyState'
 import StatusChip from '../components/common/StatusChip'
 import PageHeader from '../components/PageHeader'
 import { ActionsMenu, DataTable, FileDrop, Modal, SelectField, TextField, useToast } from '../components/ui'
-import { fmtDate, substations } from '../data/mock'
-import { projects } from '../data/projects'
+import { fmtDate } from '../data/mock'
+import { newId, usePersistent, useProjects, useSubstations } from '../data/store'
+import { useAuth } from '../context/AuthContext'
 
 const TABS: { name: string; icon: LucideIcon }[] = [
   { name: 'Area Map', icon: MapIcon }, { name: 'Area Report', icon: FileText }, { name: 'Presentation', icon: Presentation }, { name: 'Zoning', icon: Layers },
   { name: 'Project Layout', icon: FileImage }, { name: 'Issues', icon: AlertCircle }, { name: 'History', icon: History }, { name: 'PPR', icon: ClipboardList },
 ]
-const ME = 'venkat reddy'
+const SEED_ACTIVE: Record<string, string> = { 'Project Layout': 'pl-test.jpg' }
+const NO_ACTIVE: Record<string, string> = {}
+const NO_INACTIVE: Record<string, FileRow[]> = {}
+const SEED_PPR: PprRow[] = [{ id: 'p1', substation: 'Towers of Kifaf', createdBy: 'Mariam Mohamed Alhosani', createdOn: '2026-01-23T08:34:31', updatedBy: 'Mariam Mohamed Alhosani', updatedOn: '2026-01-23T08:34:31', active: true, fileName: 'twrkifaf.pdf' }]
+const NO_PPR: PprRow[] = []
+const NO_ISSUES: IssueRow[] = []
+const NO_HISTORY: HistoryRow[] = []
 const ACCEPT_HINT = 'Accepted: DOC, DOCX, XLSX, XLS, JPG, PNG, JPEG and PDF.'
 
 interface FileRow { id: string; name: string; uploadedAt: string; uploadedBy: string; active: boolean }
@@ -35,16 +42,22 @@ const SearchRow = ({ q, setQ, placeholder, action }: { q: string; setQ: (s: stri
 export default function ProjectFilesPage() {
   const { id = '', tab = 'Area Map' } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const ME = user?.name ?? 'Unknown'
+  const [projects] = useProjects()
+  const [substations] = useSubstations()
   const project = projects.find((p) => p.id === id)
   const [toast, say] = useToast()
   const [modal, setModal] = useState(false)
   const [q, setQ] = useState('')
   const [file, setFile] = useState<File | null>(null)
-  const [activeFiles, setActiveFiles] = useState<Record<string, string>>({ 'Project Layout': 'pl-test.jpg' })
-  const [inactive, setInactive] = useState<Record<string, FileRow[]>>({})
-  const [issues, setIssues] = useState<IssueRow[]>([])
-  const [history, setHistory] = useState<HistoryRow[]>([])
-  const [ppr, setPpr] = useState<PprRow[]>([{ id: 'p1', substation: 'Towers of Kifaf', createdBy: 'Mariam Mohamed Alhosani', createdOn: '2026-01-23T08:34:31', updatedBy: 'Mariam Mohamed Alhosani', updatedOn: '2026-01-23T08:34:31', active: true, fileName: 'twrkifaf.pdf' }])
+  const seededFiles = /^\d+$/.test(id)
+  const [activeFiles, setActiveFiles] = usePersistent<Record<string, string>>(`project:${id}:active`, seededFiles ? SEED_ACTIVE : NO_ACTIVE)
+  const [inactive, setInactive] = usePersistent<Record<string, FileRow[]>>(`project:${id}:inactive`, NO_INACTIVE)
+  const [issues, setIssues] = usePersistent<IssueRow[]>(`project:${id}:issues`, NO_ISSUES)
+  const [history, setHistory] = usePersistent<HistoryRow[]>(`project:${id}:history`, NO_HISTORY)
+  const seeded = /^\d+$/.test(id)
+  const [ppr, setPpr] = usePersistent<PprRow[]>(`project:${id}:ppr`, seeded ? SEED_PPR : NO_PPR)
   const [desc, setDesc] = useState('')
   const [hDate, setHDate] = useState('')
   const [ptp, setPtp] = useState('')
@@ -53,7 +66,7 @@ export default function ProjectFilesPage() {
 
   const close = () => { setModal(false); setFile(null); setDesc(''); setHDate(''); setPtp(''); setMp(''); setSubstation('') }
   const now = () => new Date().toISOString()
-  const uid = () => String(Date.now())
+  const uid = newId
   const submit = () => {
     if (tab === 'Issues') setIssues((p) => [...p, { id: uid(), description: desc, fileName: file?.name ?? '', createdBy: ME, createdOn: now(), active: true }])
     else if (tab === 'History') setHistory((p) => [...p, { id: uid(), date: hDate, ptpReceived: ptp, mpRef: mp, createdBy: ME, createdOn: now(), active: true, reply: file?.name ?? '' }])

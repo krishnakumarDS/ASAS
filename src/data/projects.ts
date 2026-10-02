@@ -6,9 +6,10 @@ export interface Project {
   createdBy: string
   createdOn: string
   display: boolean
+  consultant?: string
 }
 
-export const projects: Project[] = [
+const base: Project[] = [
   { id: '1', maalemRef: 'MP-00064-134', name: 'Al Kifaf Development', developer: 'Al Wasl', createdBy: 'Mariam Mohamed', createdOn: '2025-10-23T12:16:33', display: false },
   { id: '2', maalemRef: 'MP-00005-164', name: 'Bluewaters', developer: 'Dubai Holdings Real Estate', createdBy: 'Mariam Mohamed', createdOn: '2025-07-24T13:56:52', display: false },
   { id: '3', maalemRef: 'MP-00021-280', name: 'Cherrywood', developer: 'SHAMAL ESTATES LLC', createdBy: 'Mariam Mohamed', createdOn: '2025-09-24T09:12:12', display: false },
@@ -25,3 +26,6 @@ export const consultantByProject: Record<string, string> = {
   '1': 'AECOM', '2': 'Zutari Engineering International', '3': 'Parsons & DMF ENGINEERING', '4': 'AECOM', '5': 'LACASA',
   '6': 'Khatib & Alami', '7': 'CDM Smith', '8': 'Arch-Group', '9': 'Kifaf Development', '10': 'KEO-VARIOUS',
 }
+
+/** Seed projects, with their consultant filled in. */
+export const projects: Project[] = base.map((p) => ({ ...p, consultant: consultantByProject[p.id] ?? '' }))

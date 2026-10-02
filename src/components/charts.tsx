@@ -1,10 +1,23 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import styles from './charts.module.css'
 
 export type ChartColor = 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info'
 interface Slice { label: string; value: number; color: ChartColor }
 const colorVar: Record<ChartColor, string> = { primary: 'var(--accent-600)', secondary: 'var(--accent-500)', success: 'var(--color-success)', warning: 'var(--color-warning)', error: 'var(--color-danger)', info: 'var(--color-info)' }
 const pick = (c: ChartColor) => colorVar[c]
+
+/** Smooth curve through points (Catmull-Rom converted to cubic Béziers). */
+function smooth(pts: [number, number][]) {
+  if (pts.length < 2) return ''
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] ?? p2
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6]
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6]
+    d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`
+  }
+  return d
+}
 
 export function Donut({ data, size = 150, centerLabel = 'Total' }: { data: Slice[]; size?: number; centerLabel?: string }) {
   const total = data.reduce((a, d) => a + d.value, 0)
@@ -89,7 +102,7 @@ export function LineChart({ labels, actual, forecast, height = 240, unit = '' }:
   const W = 600, H = 220, pad = 28
   const x = (i: number) => pad + (i / (labels.length - 1)) * (W - pad * 2)
   const y = (v: number) => H - pad - ((v - min) / (max - min || 1)) * (H - pad * 2)
-  const path = (vals: number[]) => vals.map((v, i) => (Number.isNaN(v) ? null : `${i === vals.findIndex((q) => !Number.isNaN(q)) ? 'M' : 'L'}${x(i)},${y(v)}`)).filter(Boolean).join(' ')
+  const path = (vals: number[]) => smooth(vals.map((v, i): [number, number] | null => (Number.isNaN(v) ? null : [x(i), y(v)])).filter((p): p is [number, number] => p !== null))
   const lastA = actual.length - 1
   return (
     <div>
@@ -108,13 +121,17 @@ export function LineChart({ labels, actual, forecast, height = 240, unit = '' }:
 
 /** Tiny inline trend line for KPI cards. */
 export function Sparkline({ values, color = 'primary' }: { values: number[]; color?: ChartColor }) {
+  const id = useId()
   const max = Math.max(...values), min = Math.min(...values)
-  const pts = values.map((v, i) => [(i / (values.length - 1)) * 100, 30 - ((v - min) / (max - min || 1)) * 26])
-  const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+  const pts = values.map((v, i): [number, number] => [(i / (values.length - 1)) * 100, 28 - ((v - min) / (max - min || 1)) * 22])
+  const line = smooth(pts)
+  const last = pts[pts.length - 1]
   return (
-    <svg viewBox="0 0 100 32" preserveAspectRatio="none" width="100%" height="36" aria-hidden>
-      <path d={`${line} L100,32 L0,32 Z`} fill={pick(color)} opacity="0.12" />
-      <path d={line} fill="none" stroke={pick(color)} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 100 32" preserveAspectRatio="none" width="100%" height="40" aria-hidden>
+      <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={pick(color)} stopOpacity="0.28" /><stop offset="1" stopColor={pick(color)} stopOpacity="0" /></linearGradient></defs>
+      <path d={`${line} L100,32 L0,32 Z`} fill={`url(#${id})`} />
+      <path d={line} fill="none" stroke={pick(color)} strokeWidth="2.4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={last[0]} cy={last[1]} r="1.8" fill={pick(color)} vectorEffect="non-scaling-stroke" />
     </svg>
   )
 }
@@ -128,7 +145,8 @@ export function AreaChart({ labels, series, height = 250 }: { labels: string[]; 
   const W = 640, H = 240, L = 34, R = 12, T = 12, B = 26
   const x = (i: number) => L + (i / (labels.length - 1)) * (W - L - R)
   const y = (v: number) => H - B - ((v - min) / (max - min || 1)) * (H - T - B)
-  const path = (v: number[]) => v.map((q, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(q).toFixed(1)}`).join(' ')
+  const path = (v: number[]) => smooth(v.map((q, i): [number, number] => [x(i), y(q)]))
+  const gid = useId()
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect()
     const px = ((e.clientX - r.left) / r.width) * W
@@ -138,8 +156,10 @@ export function AreaChart({ labels, series, height = 250 }: { labels: string[]; 
     <div style={{ position: 'relative' }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ height, display: 'block' }} onMouseMove={onMove} onMouseLeave={() => setHover(null)} role="img" aria-label={series.map((s) => s.name).join(' and ')}>
         {[0, 0.25, 0.5, 0.75, 1].map((t) => <g key={t}><line x1={L} x2={W - R} y1={T + t * (H - T - B)} y2={T + t * (H - T - B)} stroke="var(--border-light)" /><text x={L - 6} y={T + t * (H - T - B) + 3.5} fontSize="10" textAnchor="end" fill="var(--text-tertiary)">{Math.round(max - t * (max - min))}</text></g>)}
-        {series.map((s, i) => <path key={`a${i}`} d={`${path(s.values)} L${x(labels.length - 1)},${H - B} L${x(0)},${H - B} Z`} fill={pick(s.color)} opacity={i === 0 ? 0.14 : 0.06} />)}
-        {series.map((s) => <path key={s.name} d={path(s.values)} fill="none" stroke={pick(s.color)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />)}
+        <defs>{series.map((s, i) => <linearGradient key={i} id={`${gid}${i}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={pick(s.color)} stopOpacity="0.32" /><stop offset="1" stopColor={pick(s.color)} stopOpacity="0" /></linearGradient>)}</defs>
+        {series.map((s, i) => <path key={`a${i}`} d={`${path(s.values)} L${x(labels.length - 1)},${H - B} L${x(0)},${H - B} Z`} fill={`url(#${gid}${i})`} />)}
+        {series.map((s) => <path key={s.name} d={path(s.values)} fill="none" stroke={pick(s.color)} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />)}
+        {series.map((s) => s.values.map((q, i) => <circle key={s.name + i} cx={x(i)} cy={y(q)} r="3" fill="var(--bg-secondary)" stroke={pick(s.color)} strokeWidth="2" />))}
         {labels.map((l, i) => (labels.length <= 8 || i % Math.ceil(labels.length / 8) === 0) && <text key={i} x={x(i)} y={H - 7} fontSize="10" textAnchor="middle" fill="var(--text-tertiary)">{l}</text>)}
         {hover !== null && <g><line x1={x(hover)} x2={x(hover)} y1={T} y2={H - B} stroke="var(--border-strong)" strokeDasharray="3 3" />{series.map((s) => <circle key={s.name} cx={x(hover)} cy={y(s.values[hover])} r="4.5" fill="var(--bg-secondary)" stroke={pick(s.color)} strokeWidth="2.5" />)}</g>}
       </svg>

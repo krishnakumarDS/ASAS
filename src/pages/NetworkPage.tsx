@@ -3,8 +3,7 @@ import { Flame, Network } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import StatusChip from '../components/common/StatusChip'
 import { Tabs } from '../components/ui'
-import { substations } from '../data/mock'
-import { projects } from '../data/projects'
+import { useProjects, useSubstations } from '../data/store'
 import styles from './NetworkPage.module.css'
 
 const ZONES = ['Al Barsha', 'Dubai South', 'Jebel Ali', 'Business Bay', 'Downtown', 'Deira', 'Mirdif', 'Al Quoz', 'Marina', 'Hatta', 'Meydan', 'Warsan']
@@ -13,13 +12,15 @@ const METRICS = { load: 'Load', growth: 'Growth', risk: 'Constraint risk' } as c
 type Metric = keyof typeof METRICS
 
 export default function NetworkPage() {
+  const [substations] = useSubstations()
+  const [projects] = useProjects()
   const [tab, setTab] = useState('Network model')
   const [metric, setMetric] = useState<Metric>('load')
   const [zone, setZone] = useState<number | null>(null)
   const nodes = useMemo(() => substations.map((s, i) => {
     const a = (i / substations.length) * Math.PI * 2 - Math.PI / 2
     return { ...s, x: 50 + 38 * Math.cos(a), y: 50 + 38 * Math.sin(a), load: Math.round(40 + seedRand(i, 1) * 55) }
-  }), [])
+  }), [substations])
   const zones = ZONES.map((z, i) => ({ name: z, load: Math.round(35 + seedRand(i, 2) * 60), growth: Math.round(3 + seedRand(i, 3) * 28), risk: Math.round(10 + seedRand(i, 4) * 85), projects: projects.filter((_, pi) => (pi + i) % 5 === 0) }))
   const val = (z: (typeof zones)[number]) => z[metric]
   const tone = (v: number) => (v >= 75 ? 'var(--color-danger)' : v >= 50 ? 'var(--color-warning)' : 'var(--accent-500)')

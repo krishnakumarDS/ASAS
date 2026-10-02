@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Sparkles, Bell, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
+import { RotateCcw, Sparkles, Bell, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { DEWA_LOGO_WHITE } from '../../assets/logos'
 import { NAV_GROUPS } from '../../constants/navigation'
 import { useAuth } from '../../context/AuthContext'
+import { clearStored } from '../../data/store'
 import { markLeft } from '../../data/session'
 import { useTheme } from '../../context/ThemeContext'
 import AiChat, { openChat } from '../ai/AiChat'
+import ConfirmationDialog from '../common/ConfirmationDialog'
 import IconButton from '../common/IconButton'
 import { useOutsideClose } from '../ui'
 import styles from './AppLayout.module.css'
@@ -28,6 +30,7 @@ export default function AppLayout() {
   const [bell, setBell] = useState(false)
   const [menu, setMenu] = useState(false)
   const [q, setQ] = useState('')
+  const [reset, setReset] = useState(false)
   const bellRef = useOutsideClose(() => setBell(false))
   const menuRef = useOutsideClose(() => setMenu(false))
   useEffect(() => setOpen(false), [pathname])
@@ -103,6 +106,7 @@ export default function AppLayout() {
                 <div className="menu-sep" />
                 <button onClick={() => setMenu(false)}><UserRound size={16} /> Profile</button>
                 <button onClick={() => setMenu(false)}><Settings size={16} /> Settings</button>
+                <button onClick={() => { setMenu(false); setReset(true) }}><RotateCcw size={16} /> Reset local data</button>
                 <div className="menu-sep" />
                 <button className="danger" onClick={logOut}><LogOut size={16} /> Log out</button>
               </div>
@@ -111,6 +115,7 @@ export default function AppLayout() {
         </header>
         <main className={styles.content} id="main"><Outlet /></main>
         <AiChat />
+        <ConfirmationDialog open={reset} title="Reset local data" message="This removes everything you added or changed in this browser and restores the sample data." confirmLabel="Reset" destructive onConfirm={() => { clearStored(); window.location.reload() }} onClose={() => setReset(false)} />
         <footer className={styles.footer}><span>© {new Date().getFullYear()} Dubai Electricity &amp; Water Authority (PJSC)</span><span>ASAS Search Engine Portal</span></footer>
       </div>
     </div>

@@ -3,18 +3,17 @@ import { Building2, Download, FileSpreadsheet, FileText, HardHat, Handshake, Map
 import type { LucideIcon } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import PageHeader from '../components/PageHeader'
-import { consultants, developers, plots, substations } from '../data/mock'
-import { consultantByProject, projects } from '../data/projects'
 import { useToast } from '../components/ui'
+import { snapshot, useConsultants, useDevelopers, usePlots, useProjects, useSubstations } from '../data/store'
 
 type Row = Record<string, string | number | boolean>
 interface Source { key: string; label: string; icon: LucideIcon; rows: () => Row[] }
 const SOURCES: Source[] = [
-  { key: 'projects', label: 'Projects', icon: Building2, rows: () => projects.map((p) => ({ 'Maalem ref': p.maalemRef, Project: p.name, Developer: p.developer, Consultant: consultantByProject[p.id] ?? '', 'Created by': p.createdBy, 'Created on': p.createdOn, Displayed: p.display })) },
-  { key: 'plots', label: 'Plots', icon: MapPinned, rows: () => plots.map((p) => ({ 'Maalem ref': p.maalemRef, Project: p.projectName, 'Dev plot': p.devPlot, 'DM plot': p.dmPlot, Developer: p.developer, Consultant: p.consultant, Displayed: p.display })) },
-  { key: 'substations', label: 'Substations', icon: Zap, rows: () => substations.map((s) => ({ Substation: s.name, SCADA: s.scada, 'Built by': s.builtBy, 'Smart Office': s.showInSO, 'Created on': s.createdOn })) },
-  { key: 'developers', label: 'Developers', icon: HardHat, rows: () => developers.map((d) => ({ Developer: d.name, 'Created by': d.createdBy, 'Created on': d.createdOn, 'Linked projects': projects.filter((p) => p.developer.split(' (')[0] === d.name.split(' (')[0]).length })) },
-  { key: 'consultants', label: 'Consultants', icon: Handshake, rows: () => consultants.map((c) => ({ Consultant: c.name, 'Created by': c.createdBy, 'Created on': c.createdOn, 'Linked projects': projects.filter((p) => consultantByProject[p.id] === c.name).length })) },
+  { key: 'projects', label: 'Projects', icon: Building2, rows: () => snapshot.projects().map((p) => ({ 'Maalem ref': p.maalemRef, Project: p.name, Developer: p.developer, Consultant: p.consultant ?? '', 'Created by': p.createdBy, 'Created on': p.createdOn, Displayed: p.display })) },
+  { key: 'plots', label: 'Plots', icon: MapPinned, rows: () => snapshot.plots().map((p) => ({ 'Maalem ref': p.maalemRef, Project: p.projectName, 'Dev plot': p.devPlot, 'DM plot': p.dmPlot, Developer: p.developer, Consultant: p.consultant, Displayed: p.display })) },
+  { key: 'substations', label: 'Substations', icon: Zap, rows: () => snapshot.substations().map((s) => ({ Substation: s.name, SCADA: s.scada, 'Built by': s.builtBy, 'Smart Office': s.showInSO, 'Created on': s.createdOn })) },
+  { key: 'developers', label: 'Developers', icon: HardHat, rows: () => snapshot.developers().map((d) => ({ Developer: d.name, 'Created by': d.createdBy, 'Created on': d.createdOn, 'Linked projects': snapshot.projects().filter((p) => p.developer.split(' (')[0] === d.name.split(' (')[0]).length })) },
+  { key: 'consultants', label: 'Consultants', icon: Handshake, rows: () => snapshot.consultants().map((c) => ({ Consultant: c.name, 'Created by': c.createdBy, 'Created on': c.createdOn, 'Linked projects': snapshot.projects().filter((p) => p.consultant === c.name).length })) },
 ]
 const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
 const toCsv = (title: string, rows: Row[]) => (rows.length ? [title.toUpperCase(), Object.keys(rows[0]).join(','), ...rows.map((r) => Object.values(r).map(esc).join(','))].join('\n') : title.toUpperCase())
@@ -29,7 +28,9 @@ export default function ReportsPage() {
   const [sel, setSel] = useState<Set<string>>(new Set(['projects']))
   const [format, setFormat] = useState<'csv' | 'pdf' | 'pptx'>('csv')
   const [toast, say] = useToast()
-  const counts = useMemo(() => Object.fromEntries(SOURCES.map((s) => [s.key, s.rows().length])), [])
+  const [rp] = useProjects(), [rl] = usePlots(), [rs] = useSubstations(), [rd] = useDevelopers(), [rc] = useConsultants()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const counts = useMemo(() => Object.fromEntries(SOURCES.map((s) => [s.key, s.rows().length])), [rp, rl, rs, rd, rc])
   const total = [...sel].reduce((a, k) => a + (counts[k] ?? 0), 0)
   const toggle = (k: string) => setSel((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
 

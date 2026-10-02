@@ -8,15 +8,15 @@ import IconButton from '../components/common/IconButton'
 import StatusChip from '../components/common/StatusChip'
 import PageHeader from '../components/PageHeader'
 import { AiSearchBar, AppInput, DataTable, Pager, matchQuery, usePaged, useSort, useToast } from '../components/ui'
-import { plots as seed } from '../data/mock'
+import { newId, usePlots, useProjects } from '../data/store'
 import type { Plot } from '../data/mock'
-import { projects } from '../data/projects'
 
 const SUGGEST = ['hidden plots', 'Al Wasl', 'AECOM', 'plots without consultant']
 
 export default function PlotsPage() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState<Plot[]>(seed)
+  const [rows, setRows] = usePlots()
+  const [projects] = useProjects()
   const [q, setQ] = useState('')
   const [ref, setRef] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -74,7 +74,7 @@ export default function PlotsPage() {
       <ConfirmationDialog open={confirm} title="Delete plots" message={`Delete ${selected.size} selected plot(s)?`} confirmLabel="Delete" destructive
         onConfirm={() => { setRows(rows.filter((r) => !selected.has(r.id))); setSelected(new Set()) }} onClose={() => setConfirm(false)} />
       {upload && <AiUpload entity="Plots" fields={FIELDS.plots} onClose={() => setUpload(false)} onImport={(imp) => {
-        setRows((r) => [...imp.map((o, i): Plot => { const pr = projects.find((p) => p.maalemRef === o.maalemRef); return { id: `u${Date.now()}${i}`, maalemRef: o.maalemRef, projectName: pr?.name ?? '', devPlot: o.devPlot, dmPlot: o.dmPlot ?? '', developer: o.developer || pr?.developer || '', consultant: o.consultant ?? '', display: true } }), ...r])
+        setRows((r) => [...imp.map((o): Plot => { const pr = projects.find((p) => p.maalemRef === o.maalemRef); return { id: newId(), maalemRef: o.maalemRef, projectName: pr?.name ?? '', devPlot: o.devPlot, dmPlot: o.dmPlot ?? '', developer: o.developer || pr?.developer || '', consultant: o.consultant ?? '', display: true } }), ...r])
         say(`${imp.length} plots imported`)
       }} />}
       {toast}

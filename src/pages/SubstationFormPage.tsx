@@ -5,11 +5,15 @@ import AppButton from '../components/common/AppButton'
 import Section from '../components/common/Section'
 import PageHeader from '../components/PageHeader'
 import { DataTable, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
-import { standardLimits, substations } from '../data/mock'
+import { newId, useLimits, useSubstations } from '../data/store'
+import { useAuth } from '../context/AuthContext'
 
 export default function SubstationFormPage() {
   const { id = 'new' } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const [substations, setSubstations] = useSubstations()
+  const [standardLimits] = useLimits()
   const existing = substations.find((s) => s.id === id)
   const isNew = !existing
   const [name, setName] = useState(existing?.name ?? '')
@@ -24,7 +28,10 @@ export default function SubstationFormPage() {
   const save = () => {
     setSubmitted(true)
     if (!name || !show || !scada || !builtBy || (!isNew && !limit)) return
-    say('Substation saved'); setTimeout(() => navigate('/substations'), 900)
+    const row = { name, scada, builtBy: builtBy as 'DEWA' | 'Developer', showInSO: show === 'Yes', limit }
+    if (existing) setSubstations((l) => l.map((s) => (s.id === existing.id ? { ...s, ...row } : s)))
+    else setSubstations((l) => [{ id: newId(), ...row, createdOn: new Date().toISOString(), createdBy: user?.name ?? 'Unknown' }, ...l])
+    say('Substation saved'); setTimeout(() => navigate('/substations'), 700)
   }
 
   return (

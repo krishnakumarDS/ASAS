@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Sparkles, ChevronLeft, ChevronRight, MoreVertical, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
@@ -7,17 +7,18 @@ import EmptyState from '../common/EmptyState'
 import IconButton from '../common/IconButton'
 
 /* ---------- fields ---------- */
-const Label = ({ label, required }: { label: string; required?: boolean }) => <label>{label}{required && <span className="req" aria-hidden>*</span>}</label>
+const Label = ({ label, required, htmlFor }: { label: string; required?: boolean; htmlFor?: string }) => <label htmlFor={htmlFor}>{label}{required && <span className="req" aria-hidden>*</span>}</label>
 
 interface TextProps { label: string; value: string; onChange?: (v: string) => void; required?: boolean; error?: string; type?: string; readOnly?: boolean; placeholder?: string; multiline?: boolean }
 export function TextField({ label, value, onChange, required, error, type = 'text', readOnly, placeholder, multiline }: TextProps) {
   const cls = `${multiline ? 'textarea' : 'input'}${error ? ' invalid' : ''}`
+  const id = useId()
   return (
     <div className="field">
-      <Label label={label} required={required} />
+      <Label label={label} required={required} htmlFor={id} />
       {multiline
-        ? <textarea className={cls} value={value} placeholder={placeholder} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} aria-invalid={!!error} />
-        : <input className={cls} type={type} value={value} placeholder={placeholder} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} aria-invalid={!!error} />}
+        ? <textarea id={id} className={cls} value={value} placeholder={placeholder} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} aria-invalid={!!error} />
+        : <input id={id} className={cls} type={type} value={value} placeholder={placeholder} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} aria-invalid={!!error} />}
       {error && <span className="error-text" role="alert">{error}</span>}
     </div>
   )
@@ -25,10 +26,11 @@ export function TextField({ label, value, onChange, required, error, type = 'tex
 
 interface SelectProps { label: string; value: string; options: string[]; onChange?: (v: string) => void; required?: boolean; error?: string; disabled?: boolean }
 export function SelectField({ label, value, options, onChange, required, error, disabled }: SelectProps) {
+  const id = useId()
   return (
     <div className="field">
-      <Label label={label} required={required} />
-      <select className={`select${error ? ' invalid' : ''}`} value={value} disabled={disabled} onChange={(e) => onChange?.(e.target.value)} aria-invalid={!!error}>
+      <Label label={label} required={required} htmlFor={id} />
+      <select id={id} className={`select${error ? ' invalid' : ''}`} value={value} disabled={disabled} onChange={(e) => onChange?.(e.target.value)} aria-invalid={!!error}>
         <option value="">Select…</option>
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
@@ -53,11 +55,12 @@ export function RadioField({ label, value, options = ['Yes', 'No'], onChange, re
 
 interface PickProps { label: string; value: string; onPick: () => void; buttonLabel: string; required?: boolean; error?: string; disabled?: boolean }
 export function PickField({ label, value, onPick, buttonLabel, required, error, disabled }: PickProps) {
+  const id = useId()
   return (
     <div className="field">
-      <Label label={label} required={required} />
+      <Label label={label} required={required} htmlFor={id} />
       <div className="with-action">
-        <input className={`input${error ? ' invalid' : ''}`} value={value} readOnly placeholder="Not selected" />
+        <input id={id} className={`input${error ? ' invalid' : ''}`} value={value} readOnly placeholder="Not selected" />
         <AppButton variant="outlined" disabled={disabled} onClick={onPick} startIcon={<Search size={15} />}>{buttonLabel}</AppButton>
       </div>
       {error && <span className="error-text" role="alert">{error}</span>}

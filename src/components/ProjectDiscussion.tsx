@@ -3,6 +3,7 @@ import { CheckCircle2, Clock, MessageSquare, Send, XCircle } from 'lucide-react'
 import AppButton from './common/AppButton'
 import { fmtDate } from '../data/mock'
 import { useAuth } from '../context/AuthContext'
+import { newId, usePersistent } from '../data/store'
 
 type Verdict = 'Approved' | 'Rejected' | 'Deferred'
 interface Comment { id: string; by: string; at: string; text: string }
@@ -11,15 +12,18 @@ const TONE: Record<Verdict, string> = { Approved: 'badge-success', Rejected: 'ba
 const ICON = { Approved: <CheckCircle2 size={14} />, Rejected: <XCircle size={14} />, Deferred: <Clock size={14} /> }
 
 /** Discussion thread plus an append-only decision log, so approvals and their reasons are preserved with who/when. */
-export default function ProjectDiscussion() {
+const NO_C: Comment[] = []
+const NO_D: Decision[] = []
+
+export default function ProjectDiscussion({ projectId }: { projectId: string }) {
   const { user } = useAuth()
-  const [comments, setComments] = useState<Comment[]>([])
-  const [decisions, setDecisions] = useState<Decision[]>([])
+  const [comments, setComments] = usePersistent<Comment[]>(`project:${projectId}:comments`, NO_C)
+  const [decisions, setDecisions] = usePersistent<Decision[]>(`project:${projectId}:decisions`, NO_D)
   const [text, setText] = useState('')
   const [note, setNote] = useState('')
   const me = user?.name ?? 'Unknown'
-  const post = () => { if (!text.trim()) return; setComments((c) => [...c, { id: String(Date.now()), by: me, at: new Date().toISOString(), text: text.trim() }]); setText('') }
-  const decide = (verdict: Verdict) => { if (!note.trim()) return; setDecisions((d) => [{ id: String(Date.now()), by: me, at: new Date().toISOString(), verdict, note: note.trim() }, ...d]); setNote('') }
+  const post = () => { if (!text.trim()) return; setComments((c) => [...c, { id: newId(), by: me, at: new Date().toISOString(), text: text.trim() }]); setText('') }
+  const decide = (verdict: Verdict) => { if (!note.trim()) return; setDecisions((d) => [{ id: newId(), by: me, at: new Date().toISOString(), verdict, note: note.trim() }, ...d]); setNote('') }
   return (
     <div className="card-body grid-2">
       <section>

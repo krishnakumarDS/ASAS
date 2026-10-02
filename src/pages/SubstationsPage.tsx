@@ -6,14 +6,15 @@ import AppButton from '../components/common/AppButton'
 import IconButton from '../components/common/IconButton'
 import PageHeader from '../components/PageHeader'
 import { AiSearchBar, DataTable, Pager, matchQuery, usePaged, useSort, useToast } from '../components/ui'
-import { fmtDate, substations as seed } from '../data/mock'
+import { fmtDate } from '../data/mock'
+import { newId, useSubstations } from '../data/store'
 import type { Substation } from '../data/mock'
 
 const SUGGEST = ['built by DEWA', 'Developer', 'hidden in smart office', 'Remraam']
 
 export default function SubstationsPage() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState<Substation[]>(seed)
+  const [rows, setRows] = useSubstations()
   const [q, setQ] = useState('')
   const [upload, setUpload] = useState(false)
   const [toast, say] = useToast()
@@ -45,7 +46,7 @@ export default function SubstationsPage() {
         <Pager page={page} pages={pages} setPage={setPage} />
       </div>
       {upload && <AiUpload entity="Substations" fields={FIELDS.substations} onClose={() => setUpload(false)} onImport={(imp) => {
-        setRows((r) => [...imp.map((o, i): Substation => ({ id: `u${Date.now()}${i}`, name: o.name, scada: o.scada, builtBy: /dewa/i.test(o.builtBy ?? '') ? 'DEWA' : 'Developer', showInSO: true, createdOn: new Date().toISOString(), createdBy: 'AI upload' })), ...r])
+        setRows((r) => [...imp.map((o): Substation => ({ id: newId(), name: o.name, scada: o.scada, builtBy: /dewa/i.test(o.builtBy ?? '') ? 'DEWA' : 'Developer', showInSO: true, createdOn: new Date().toISOString(), createdBy: 'AI upload' })), ...r])
         say(`${imp.length} substations imported`)
       }} />}
       {toast}
