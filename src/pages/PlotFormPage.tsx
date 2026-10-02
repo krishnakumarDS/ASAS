@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Save, X } from 'lucide-react'
+import { ArrowLeft, Save } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import Section from '../components/common/Section'
 import PageHeader from '../components/PageHeader'
@@ -48,7 +48,7 @@ export default function PlotFormPage() {
     <div className="page">
       <PageHeader title={plot ? `Plot ${plot.devPlot}` : 'New plot'} subtitle={project ? `${project.maalemRef} · ${project.name}` : 'Fields marked * are required'} actions={
         <>
-          <AppButton variant="outlined" startIcon={<X size={16} />} onClick={() => navigate('/plots')}>Close</AppButton>
+          <AppButton variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/plots')}>Back</AppButton>
           <AppButton variant="contained" startIcon={<Save size={16} />} onClick={save}>Save</AppButton>
         </>
       } />

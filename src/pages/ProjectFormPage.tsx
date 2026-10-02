@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Ban, FolderOpen, Plus, Power, Save, X } from 'lucide-react'
+import { ArrowLeft, Ban, FolderOpen, Plus, Power, Save } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import Section from '../components/common/Section'
 import StatusChip from '../components/common/StatusChip'
@@ -92,7 +92,7 @@ export default function ProjectFormPage() {
         actions={<>
           {!isNew && <AppButton variant="outlined" startIcon={<FolderOpen size={16} />} onClick={() => navigate(`/projects/${id}/files/Area Map`)}>Files</AppButton>}
           {!isNew && <AppButton variant="outlined" startIcon={editable ? <Ban size={16} /> : <Power size={16} />} onClick={() => setEditable(!editable)}>{editable ? 'Disable' : 'Enable'}</AppButton>}
-          <AppButton variant="outlined" startIcon={<X size={16} />} onClick={() => navigate('/projects')}>Close</AppButton>
+          <AppButton variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/projects')}>Back</AppButton>
           {editable && <AppButton variant="contained" startIcon={<Save size={16} />} onClick={save}>Save</AppButton>}
         </>} />
 

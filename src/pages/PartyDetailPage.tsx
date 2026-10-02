@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ImageIcon, Pencil, Plus, Save, Search, Upload, X } from 'lucide-react'
+import { ArrowLeft, ImageIcon, Pencil, Plus, Save, Search, Upload } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import Section from '../components/common/Section'
 import PageHeader from '../components/PageHeader'
@@ -78,7 +78,7 @@ export default function PartyDetailPage({ kind }: { kind: Kind }) {
     <div className="page">
       <PageHeader title={isNew ? `New ${m.one.toLowerCase()}` : name} subtitle={isNew ? undefined : `${m.one} · created ${fmtDate(party?.createdOn ?? '')}`} actions={
         <>
-          <AppButton variant="outlined" startIcon={<X size={16} />} onClick={() => navigate(m.path)}>Close</AppButton>
+          <AppButton variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(m.path)}>Back</AppButton>
           {edit ? <AppButton variant="contained" startIcon={<Save size={16} />} onClick={save}>Save</AppButton>
             : <AppButton variant="contained" startIcon={<Pencil size={16} />} onClick={() => setEdit(true)}>Edit</AppButton>}
         </>

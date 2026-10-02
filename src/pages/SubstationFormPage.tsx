@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Save, X } from 'lucide-react'
+import { ArrowLeft, Save } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import Section from '../components/common/Section'
 import PageHeader from '../components/PageHeader'
@@ -38,7 +38,7 @@ export default function SubstationFormPage() {
     <div className="page">
       <PageHeader title={isNew ? 'New substation' : existing.name} subtitle={isNew ? 'Fields marked * are required' : `SCADA: ${existing.scada}`} actions={
         <>
-          <AppButton variant="outlined" startIcon={<X size={16} />} onClick={() => navigate('/substations')}>Close</AppButton>
+          <AppButton variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/substations')}>Back</AppButton>
           <AppButton variant="contained" startIcon={<Save size={16} />} onClick={save}>Save</AppButton>
         </>
       } />

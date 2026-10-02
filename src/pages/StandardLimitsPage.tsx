@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, X } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import PageHeader from '../components/PageHeader'
 import { ActionsMenu, DataTable, Modal, RadioField, TextField, useToast } from '../components/ui'
@@ -22,7 +22,7 @@ export default function StandardLimitsPage() {
     <div className="page">
       <PageHeader title="Standard limits" subtitle="Substation standard limit settings" actions={
         <>
-          <AppButton variant="outlined" startIcon={<X size={16} />} onClick={() => navigate('/substations')}>Close</AppButton>
+          <AppButton variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/substations')}>Back</AppButton>
           <AppButton variant="contained" startIcon={<Plus size={16} />} onClick={() => setOpen(true)}>Add limit</AppButton>
         </>
       } />

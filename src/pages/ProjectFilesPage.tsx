@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, ClipboardList, FileImage, FileText, History, Layers, Map as MapIcon, Plus, Presentation, RefreshCw, Search, Upload } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ClipboardList, FileImage, FileText, History, Layers, Map as MapIcon, Plus, Presentation, RefreshCw, Search, Upload } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import EmptyState from '../components/common/EmptyState'
@@ -88,7 +88,7 @@ export default function ProjectFilesPage() {
   return (
     <div className="page">
       <PageHeader title={project?.name ?? 'Project files'} subtitle={`REF# ${project?.maalemRef ?? id} · Project files`}
-        actions={<AppButton variant="outlined" onClick={() => navigate(`/projects/${id}`)}>Back to project</AppButton>} />
+        actions={<AppButton variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(`/projects/${id}`)}>Back</AppButton>} />
       <div className="split">
         <nav className="card vnav" aria-label="File types">
           {TABS.map(({ name, icon: Icon }) => <button key={name} className={name === tab ? 'on' : ''} aria-current={name === tab ? 'page' : undefined} onClick={() => { setQ(''); navigate(`/projects/${id}/files/${name}`) }}><Icon size={17} />{name}</button>)}
