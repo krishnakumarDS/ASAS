@@ -41,7 +41,7 @@
 @keyframes flow { to { stroke-dashoffset: -6.4; } }
 @keyframes hexLit { 0%, 100% { background: var(--accent-100); } 4%, 13% { background: var(--accent-500); } 24% { background: var(--accent-100); } }
 @keyframes hexInLit { 0%, 100% { background: var(--bg-secondary); color: var(--accent-700); } 4%, 13% { background: var(--accent-500); color: #fff; } 24% { background: var(--bg-secondary); color: var(--accent-700); } }
-@keyframes ripple { 0% { transform: translate(-50%, -50%) scale(1); opacity: 0.35; } 100% { transform: translate(-50%, -50%) scale(1.9); opacity: 0; } }
+@keyframes ripple { 0% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; } 100% { transform: translate(-50%, -50%) scale(1.9); opacity: 0; } }
 @keyframes corePulse { 0%, 100% { filter: drop-shadow(0 10px 22px color-mix(in srgb, var(--accent-600) 38%, transparent)); } 50% { filter: drop-shadow(0 10px 34px color-mix(in srgb, var(--accent-500) 70%, transparent)); } }
 .hex { position: absolute; width: 20%; aspect-ratio: 0.87; transform: translate(-50%, -50%); animation: heroFloat 9s ease-in-out infinite var(--d), hexLit 5.4s ease-in-out infinite var(--lit); filter: drop-shadow(0 6px 10px color-mix(in srgb, var(--accent-700) 18%, transparent)); }
 .hex, .hexIn, .core, .coreIn { clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
@@ -70,6 +70,6 @@ html:global(.dark) .hexIn { color: var(--accent-600); }
 }
 @media (max-width: 640px) { .chip { display: none; } }
 
-.ripple { position: absolute; left: 50%; top: 50%; width: 28%; aspect-ratio: 0.87; background: var(--accent-500); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); animation: ripple 3s ease-out infinite; pointer-events: none; }
+.ripple { position: absolute; left: 50%; top: 50%; width: 28%; aspect-ratio: 0.87; background: var(--accent-500); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); transform: translate(-50%, -50%); opacity: 0; animation: ripple 3s ease-out infinite both; pointer-events: none; }
 .ripple2 { animation-delay: 1.5s; }
 .ring { animation-duration: 40s; }
