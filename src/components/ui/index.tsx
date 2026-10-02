@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Sparkles, ChevronLeft, ChevronRight, MoreVertical, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
 import AppButton from '../common/AppButton'
 import EmptyState from '../common/EmptyState'
@@ -99,14 +100,15 @@ export function Modal({ title, onClose, children, footer, size = 'md' }: { title
     document.body.style.overflow = 'hidden'
     return () => { window.removeEventListener('keydown', h); document.body.style.overflow = prev }
   }, [onClose])
-  return (
+  return createPortal(
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className={`modal-panel size-${size}`} role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-header"><h2>{title}</h2><IconButton small onClick={onClose} aria-label="Close"><X size={18} /></IconButton></div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

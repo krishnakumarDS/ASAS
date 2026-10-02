@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Sparkles, Bell, ChevronsLeft, ChevronsRight, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
+import { Sparkles, Bell, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { DEWA_LOGO_WHITE } from '../../assets/logos'
 import { NAV_GROUPS } from '../../constants/navigation'
@@ -22,7 +22,8 @@ export default function AppLayout() {
   const { dark, toggle } = useTheme()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const [collapsed, setCollapsed] = useState(false)
+  const [hover, setHover] = useState(false)
+  const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 961px)').matches)
   const [open, setOpen] = useState(false)
   const [bell, setBell] = useState(false)
   const [menu, setMenu] = useState(false)
@@ -30,11 +31,20 @@ export default function AppLayout() {
   const bellRef = useOutsideClose(() => setBell(false))
   const menuRef = useOutsideClose(() => setMenu(false))
   useEffect(() => setOpen(false), [pathname])
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 961px)')
+    const h = () => setDesktop(mq.matches)
+    mq.addEventListener('change', h)
+    return () => mq.removeEventListener('change', h)
+  }, [])
+  // Desktop: icon rail by default, expands over the page while hovered or keyboard-focused. Mobile: slide-in drawer.
+  const collapsed = desktop && !hover
   const isActive = (p?: string) => !!p && (p === '/' ? pathname === '/' : pathname.startsWith(p))
   const logOut = () => { markLeft(); navigate('/login') }
 
   return (
     <div className={styles.shell}>
+      <div className={styles.rail} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setHover(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setHover(false) }}>
       <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''} ${open ? styles.open : ''}`} aria-label="Primary">
         <div className={styles.brand}>
           <img className={styles.brandLogo} src={DEWA_LOGO_WHITE} alt="Dubai Electricity & Water Authority" />
@@ -61,12 +71,12 @@ export default function AppLayout() {
           <IconButton small className={styles.signout} onClick={logOut} aria-label="Log out" title="Log out"><LogOut size={16} /></IconButton>
         </div>
       </aside>
+      </div>
       {open && <div className={styles.scrim} onClick={() => setOpen(false)} />}
 
       <div className={styles.main}>
         <header className={styles.header}>
           <IconButton className={styles.menuBtn} onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={20} /></IconButton>
-          <IconButton className={styles.collapseBtn} onClick={() => setCollapsed((c) => !c)} aria-label="Toggle sidebar" title="Toggle sidebar">{collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}</IconButton>
           <div className={styles.search}>
             <Search size={15} />
             <input className="input" placeholder="Search projects, plots, developers…" aria-label="Global search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && q.trim()) { navigate('/projects'); setQ('') } }} />

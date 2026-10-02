@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import styles from './charts.module.css'
 
 export type ChartColor = 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info'
@@ -101,6 +102,54 @@ export function LineChart({ labels, actual, forecast, height = 240, unit = '' }:
         {labels.map((l, i) => (i % 2 === 0 || labels.length < 10) && <text key={l + i} x={x(i)} y={H - 8} fontSize="10" textAnchor="middle" fill="var(--text-tertiary)">{l}</text>)}
       </svg>
       <ul className={styles.legend} style={{ flexDirection: 'row', display: 'flex', gap: 18, marginTop: 8 }}><li><i style={{ background: 'var(--color-info)' }} />Actual</li><li><i style={{ background: 'var(--accent-600)' }} />Forecast</li></ul>
+    </div>
+  )
+}
+
+/** Tiny inline trend line for KPI cards. */
+export function Sparkline({ values, color = 'primary' }: { values: number[]; color?: ChartColor }) {
+  const max = Math.max(...values), min = Math.min(...values)
+  const pts = values.map((v, i) => [(i / (values.length - 1)) * 100, 30 - ((v - min) / (max - min || 1)) * 26])
+  const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+  return (
+    <svg viewBox="0 0 100 32" preserveAspectRatio="none" width="100%" height="36" aria-hidden>
+      <path d={`${line} L100,32 L0,32 Z`} fill={pick(color)} opacity="0.12" />
+      <path d={line} fill="none" stroke={pick(color)} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+interface AreaSeries { name: string; values: number[]; color: ChartColor }
+/** Multi-series area chart with a hover read-out. */
+export function AreaChart({ labels, series, height = 250 }: { labels: string[]; series: AreaSeries[]; height?: number }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const all = series.flatMap((s) => s.values)
+  const max = Math.max(...all) * 1.08, min = Math.min(...all) * 0.85
+  const W = 640, H = 240, L = 34, R = 12, T = 12, B = 26
+  const x = (i: number) => L + (i / (labels.length - 1)) * (W - L - R)
+  const y = (v: number) => H - B - ((v - min) / (max - min || 1)) * (H - T - B)
+  const path = (v: number[]) => v.map((q, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(q).toFixed(1)}`).join(' ')
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const px = ((e.clientX - r.left) / r.width) * W
+    setHover(Math.max(0, Math.min(labels.length - 1, Math.round(((px - L) / (W - L - R)) * (labels.length - 1)))))
+  }
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ height, display: 'block' }} onMouseMove={onMove} onMouseLeave={() => setHover(null)} role="img" aria-label={series.map((s) => s.name).join(' and ')}>
+        {[0, 0.25, 0.5, 0.75, 1].map((t) => <g key={t}><line x1={L} x2={W - R} y1={T + t * (H - T - B)} y2={T + t * (H - T - B)} stroke="var(--border-light)" /><text x={L - 6} y={T + t * (H - T - B) + 3.5} fontSize="10" textAnchor="end" fill="var(--text-tertiary)">{Math.round(max - t * (max - min))}</text></g>)}
+        {series.map((s, i) => <path key={`a${i}`} d={`${path(s.values)} L${x(labels.length - 1)},${H - B} L${x(0)},${H - B} Z`} fill={pick(s.color)} opacity={i === 0 ? 0.14 : 0.06} />)}
+        {series.map((s) => <path key={s.name} d={path(s.values)} fill="none" stroke={pick(s.color)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />)}
+        {labels.map((l, i) => (labels.length <= 8 || i % Math.ceil(labels.length / 8) === 0) && <text key={i} x={x(i)} y={H - 7} fontSize="10" textAnchor="middle" fill="var(--text-tertiary)">{l}</text>)}
+        {hover !== null && <g><line x1={x(hover)} x2={x(hover)} y1={T} y2={H - B} stroke="var(--border-strong)" strokeDasharray="3 3" />{series.map((s) => <circle key={s.name} cx={x(hover)} cy={y(s.values[hover])} r="4.5" fill="var(--bg-secondary)" stroke={pick(s.color)} strokeWidth="2.5" />)}</g>}
+      </svg>
+      {hover !== null && (
+        <div style={{ position: 'absolute', top: 6, left: `${Math.min(78, Math.max(2, (x(hover) / W) * 100 + 2))}%`, background: 'var(--bg-elevated)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)', padding: '8px 12px', fontSize: 12, pointerEvents: 'none' }}>
+          <b>{labels[hover]}</b>
+          {series.map((s) => <div key={s.name} className="row" style={{ gap: 6, marginTop: 3 }}><i style={{ width: 8, height: 8, borderRadius: '50%', background: pick(s.color) }} />{s.name}: <b className="num">{s.values[hover]}</b></div>)}
+        </div>
+      )}
+      <ul className={styles.legend} style={{ display: 'flex', flexDirection: 'row', gap: 18, marginTop: 6 }}>{series.map((s) => <li key={s.name}><i style={{ background: pick(s.color) }} />{s.name}</li>)}</ul>
     </div>
   )
 }
