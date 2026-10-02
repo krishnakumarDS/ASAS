@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { ArrowRight, Moon, ShieldCheck, Sun, Zap } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AppButton from '../../components/common/AppButton'
@@ -15,10 +16,26 @@ const node = (i: number) => {
   return { x: 50 + 32 * Math.cos(a), y: 50 + 32 * Math.sin(a) }
 }
 const STATS = [
-  { label: 'Active projects', value: '256', pos: styles.s1 },
-  { label: 'KPI compliance', value: '92%', pos: styles.s2 },
-  { label: 'Systems connected', value: '6', pos: styles.s3 },
+  { label: 'Active projects', value: 256, suffix: '', pos: styles.s1 },
+  { label: 'KPI compliance', value: 92, suffix: '%', pos: styles.s2 },
+  { label: 'Systems connected', value: 6, suffix: '', pos: styles.s3 },
 ]
+
+const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/** Counts up to `to` on mount (instant when the user prefers reduced motion). */
+function CountUp({ to, suffix = '' }: { to: number; suffix?: string }) {
+  const [n, setN] = useState(reducedMotion() ? to : 0)
+  useEffect(() => {
+    if (reducedMotion()) return
+    const t0 = performance.now(), dur = 1400
+    let raf = 0
+    const tick = (t: number) => { const k = Math.min(1, (t - t0) / dur); setN(Math.round(to * (1 - Math.pow(1 - k, 3)))); if (k < 1) raf = requestAnimationFrame(tick) }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [to])
+  return <>{n}{suffix}</>
+}
 
 export default function LoginPage() {
   const { user, loading, error } = useAuth()
@@ -66,21 +83,34 @@ export default function LoginPage() {
             <i className={styles.ring} />
             <svg className={styles.lines} viewBox="0 0 100 100" aria-hidden>
               {SYSTEMS.map((_, i) => { const n = node(i); return <line key={i} x1="50" y1="50" x2={n.x} y2={n.y} /> })}
+              {!reducedMotion() && SYSTEMS.map((_, i) => {
+                const n = node(i), d = `${i * 0.6}s`
+                return (
+                  <g key={`p${i}`}>
+                    <circle r="1.25" className={styles.packet}>
+                      <animate attributeName="cx" values={`${n.x};50;${n.x}`} keyTimes="0;0.5;1" dur="3.6s" begin={d} repeatCount="indefinite" />
+                      <animate attributeName="cy" values={`${n.y};50;${n.y}`} keyTimes="0;0.5;1" dur="3.6s" begin={d} repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="3.6s" begin={d} repeatCount="indefinite" />
+                    </circle>
+                  </g>
+                )
+              })}
             </svg>
             {SYSTEMS.map((s, i) => {
               const n = node(i)
               return (
-                <span key={s} className={styles.hex} style={{ left: `${n.x}%`, top: `${n.y}%`, ['--d' as string]: `${i * -2.2}s` }}>
+                <span key={s} className={styles.hex} style={{ left: `${n.x}%`, top: `${n.y}%`, ['--d' as string]: `${i * -2.2}s`, ['--lit' as string]: `${i * 0.9}s` }}>
                   <span className={styles.hexIn}>{s}</span>
                 </span>
               )
             })}
+            <i className={styles.ripple} /><i className={`${styles.ripple} ${styles.ripple2}`} />
             <span className={styles.core}><span className={styles.coreIn}><Zap size={20} />ASAS</span></span>
           </div>
           {STATS.map((s) => (
             <div key={s.label} className={`${styles.chip} ${s.pos}`}>
               <span className="eyebrow">{s.label}</span>
-              <b className="num">{s.value}</b>
+              <b className="num"><CountUp to={s.value} suffix={s.suffix} /></b>
             </div>
           ))}
         </section>
