@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { RotateCcw, Sparkles, Bell, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
+import { RefreshCw, RotateCcw, Sparkles, Bell, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { DEWA_LOGO_WHITE } from '../../assets/logos'
 import { NAV_GROUPS } from '../../constants/navigation'
 import { useAuth } from '../../context/AuthContext'
-import { clearStored } from '../../data/store'
+import { clearStored, refreshStored } from '../../data/store'
 import { markLeft } from '../../data/session'
 import { useTheme } from '../../context/ThemeContext'
 import AiChat, { openChat } from '../ai/AiChat'
@@ -31,6 +31,15 @@ export default function AppLayout() {
   const [menu, setMenu] = useState(false)
   const [q, setQ] = useState('')
   const [reset, setReset] = useState(false)
+  const [spin, setSpin] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const refresh = () => {
+    if (spin) return
+    setSpin(true)
+    refreshStored()
+    setRefreshKey((k) => k + 1)
+    setTimeout(() => setSpin(false), 700)
+  }
   const bellRef = useOutsideClose(() => setBell(false))
   const menuRef = useOutsideClose(() => setMenu(false))
   useEffect(() => setOpen(false), [pathname])
@@ -85,6 +94,7 @@ export default function AppLayout() {
             <input className="input" placeholder="Search projects, plots, developers…" aria-label="Global search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && q.trim()) { navigate('/projects'); setQ('') } }} />
           </div>
           <span className={styles.spacer} />
+          <IconButton onClick={refresh} aria-label="Refresh" title="Refresh"><RefreshCw size={18} className={spin ? styles.spinning : ''} /></IconButton>
           <IconButton onClick={() => openChat()} aria-label="AI assistant" title="AI assistant"><Sparkles size={18} /></IconButton>
           <IconButton onClick={toggle} aria-label="Toggle theme" title={dark ? 'Light mode' : 'Dark mode'}>{dark ? <Sun size={18} /> : <Moon size={18} />}</IconButton>
           <div className="menu" ref={bellRef}>
@@ -113,7 +123,7 @@ export default function AppLayout() {
             )}
           </div>
         </header>
-        <main className={styles.content} id="main"><Outlet /></main>
+        <main className={styles.content} id="main"><Outlet key={refreshKey} /></main>
         <AiChat />
         <ConfirmationDialog open={reset} title="Reset local data" message="This removes everything you added or changed in this browser and restores the sample data." confirmLabel="Reset" destructive onConfirm={() => { clearStored(); window.location.reload() }} onClose={() => setReset(false)} />
         <footer className={styles.footer}><span>© {new Date().getFullYear()} Dubai Electricity &amp; Water Authority (PJSC)</span><span>ASAS Search Engine Portal</span></footer>

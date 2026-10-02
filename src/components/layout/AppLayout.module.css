@@ -78,3 +78,5 @@
 
 .collapsed .userCard { padding: 14px 0; }
 .sidebar :global(.ghost-btn) { color: rgba(255,255,255,.85); }
+
+.spinning { animation: spin 0.7s ease-in-out; }

@@ -48,6 +48,12 @@ export function usePersistent<T>(key: string, seed: T) {
   return [value, set] as const
 }
 
+/** Re-reads everything from localStorage (e.g. after another tab changed it) and notifies every screen. */
+export function refreshStored() {
+  cache.clear()
+  subs.forEach((set) => set.forEach((f) => f()))
+}
+
 /** Wipes all stored ASAS data (used by "Reset local data"). */
 export function clearStored() {
   try { Object.keys(localStorage).filter((k) => k.startsWith(PREFIX)).forEach((k) => localStorage.removeItem(k)) } catch { /* ignore */ }
