@@ -9,7 +9,8 @@
 .brandText { line-height: 1.15; min-width: 0; }
 .brandText b { font-family: var(--font-heading); font-size: 17px; letter-spacing: 0.02em; display: block; }
 .brandText small { font-size: 11px; color: rgba(255,255,255,.65); white-space: nowrap; }
-.nav { flex: 1; overflow-y: auto; padding: 14px 12px; }
+.nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 14px 12px; scrollbar-width: none; }
+.nav::-webkit-scrollbar { display: none; }
 .group { margin-bottom: 18px; }
 .groupTitle { padding: 0 12px 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; }
 .collapsed .groupTitle { text-align: center; padding: 0 0 6px; font-size: 0; border-bottom: 1px solid rgba(255,255,255,.14); margin: 0 10px 8px; }

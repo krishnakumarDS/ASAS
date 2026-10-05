@@ -37,7 +37,8 @@
   --glass-border: color-mix(in srgb, var(--border-light) 64%, transparent);
 
   /* Typography — Dubai everywhere */
-  --font-dubai: 'Dubai', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Inter is bundled with the app, so text is drawn identically on Windows and macOS when Dubai isn't installed. */
+  --font-dubai: 'Dubai', 'Inter Variable', 'Inter', system-ui, sans-serif;
   --font-heading: var(--font-dubai);
   --font-body: var(--font-dubai);
   --font-mono: var(--font-dubai);
