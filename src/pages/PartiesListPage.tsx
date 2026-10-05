@@ -38,7 +38,7 @@ export default function PartiesListPage({ kind }: { kind: Kind }) {
   return (
     <div className="page">
       <PageHeader title={m.title} subtitle={m.sub} back={false} actions={<AppButton variant="contained" startIcon={<Plus size={17} />} onClick={() => navigate(`${m.path}/new`)}>Add {m.one.toLowerCase()}</AppButton>} />
-      <AiSearchBar value={q} onChange={setQ} placeholder={`Ask in plain words — e.g. “${kind === 'developer' ? 'developers with Dubai in the name' : 'consultants added by Mariam'}”`} suggestions={kind === 'developer' ? ['Dubai', 'Meraas', 'Al Wasl'] : ['AECOM', 'Engineering', 'Mariam']} resultText={`${rows.length} of ${data.length} ${m.title.toLowerCase()}`} />
+      <AiSearchBar value={q} onChange={setQ} placeholder={`Ask in plain words — e.g. “${data[0]?.name.split(' ')[0] ?? 'name'}”`} suggestions={data.slice(0, 3).map((d) => d.name.split(' ')[0])} resultText={`${rows.length} of ${data.length} ${m.title.toLowerCase()}`} />
       <div className="row wrap" style={{ gap: 8, marginBottom: 14 }}>
         <span className="eyebrow">Sort by</span>
         {([['name', 'Name'], ['projects', 'Linked projects'], ['created', 'Date added']] as [SortKey, string][]).map(([k, l]) => (

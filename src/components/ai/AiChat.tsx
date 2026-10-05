@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Send, Sparkles, X } from 'lucide-react'
 import IconButton from '../common/IconButton'
 import { exceeding, engineers } from '../../data/dashboard'
@@ -9,7 +9,6 @@ export const OPEN_CHAT = 'asas:open-chat'
 export const openChat = (prompt?: string) => window.dispatchEvent(new CustomEvent(OPEN_CHAT, { detail: prompt }))
 
 interface Msg { from: 'user' | 'bot'; text: string }
-const SUGGEST = ['Which submissions are exceeding KPI?', 'Who has available workload?', 'Projects by Al Wasl', 'How many substations are built by DEWA?']
 const has = (s: string, ...w: string[]) => w.some((x) => s.includes(x))
 
 /** Answers from the app's own sample data with simple rules. Swap `reply` for a call to the real AI service when it is connected. */
@@ -37,6 +36,7 @@ export default function AiChat() {
   const [input, setInput] = useState('')
   const [typing, setTyping] = useState(false)
   const end = useRef<HTMLDivElement>(null)
+  const SUGGEST = useMemo(() => ['Which submissions are exceeding KPI?', 'Who has available workload?', `Projects by ${snapshot.developers()[0]?.name ?? 'a developer'}`, 'How many substations are built by DEWA?'], [])
 
   const send = (t: string) => {
     const text = t.trim(); if (!text) return

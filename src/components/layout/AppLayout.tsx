@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw, RotateCcw, Sparkles, Bell, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { DEWA_LOGO_WHITE } from '../../assets/logos'
 import { NAV_GROUPS } from '../../constants/navigation'
 import { useAuth } from '../../context/AuthContext'
-import { clearStored, refreshStored } from '../../data/store'
+import { exceeding } from '../../data/dashboard'
+import { clearStored, refreshStored, snapshot } from '../../data/store'
 import { markLeft } from '../../data/session'
 import { useTheme } from '../../context/ThemeContext'
 import AiChat, { openChat } from '../ai/AiChat'
@@ -13,11 +14,6 @@ import IconButton from '../common/IconButton'
 import { useOutsideClose } from '../ui'
 import styles from './AppLayout.module.css'
 
-const notifications = [
-  { id: 1, text: '5 submissions are exceeding KPI', time: '10 min ago' },
-  { id: 2, text: 'New project added: Al Kifaf Development', time: '1 h ago' },
-  { id: 3, text: 'Plot upload completed for Port Views', time: 'Yesterday' },
-]
 
 export default function AppLayout() {
   const { user } = useAuth()
@@ -28,6 +24,14 @@ export default function AppLayout() {
   const [desktop, setDesktop] = useState(() => window.matchMedia('(min-width: 961px)').matches)
   const [open, setOpen] = useState(false)
   const [bell, setBell] = useState(false)
+  const notifications = useMemo(() => {
+    const pr = snapshot.projects(), pl = snapshot.plots()
+    return [
+      { id: 1, text: `${exceeding.length} submissions are exceeding KPI`, time: '10 min ago' },
+      { id: 2, text: `New project added: ${pr[0]?.name ?? 'Project'}`, time: '1 h ago' },
+      { id: 3, text: `Plot upload completed for ${pl[0]?.projectName ?? 'a project'}`, time: 'Yesterday' },
+    ]
+  }, [])
   const [menu, setMenu] = useState(false)
   const [q, setQ] = useState('')
   const [reset, setReset] = useState(false)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertCircle, ArrowLeft, ClipboardList, FileImage, FileText, History, Layers, Map as MapIcon, Plus, Presentation, RefreshCw, Search, Upload } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -15,10 +15,8 @@ const TABS: { name: string; icon: LucideIcon }[] = [
   { name: 'Area Map', icon: MapIcon }, { name: 'Area Report', icon: FileText }, { name: 'Presentation', icon: Presentation }, { name: 'Zoning', icon: Layers },
   { name: 'Project Layout', icon: FileImage }, { name: 'Issues', icon: AlertCircle }, { name: 'History', icon: History }, { name: 'PPR', icon: ClipboardList },
 ]
-const SEED_ACTIVE: Record<string, string> = { 'Project Layout': 'pl-test.jpg' }
 const NO_ACTIVE: Record<string, string> = {}
 const NO_INACTIVE: Record<string, FileRow[]> = {}
-const SEED_PPR: PprRow[] = [{ id: 'p1', substation: 'Towers of Kifaf', createdBy: 'Mariam Mohamed Alhosani', createdOn: '2026-01-23T08:34:31', updatedBy: 'Mariam Mohamed Alhosani', updatedOn: '2026-01-23T08:34:31', active: true, fileName: 'twrkifaf.pdf' }]
 const NO_PPR: PprRow[] = []
 const NO_ISSUES: IssueRow[] = []
 const NO_HISTORY: HistoryRow[] = []
@@ -52,12 +50,14 @@ export default function ProjectFilesPage() {
   const [q, setQ] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const seededFiles = /^\d+$/.test(id)
-  const [activeFiles, setActiveFiles] = usePersistent<Record<string, string>>(`project:${id}:active`, seededFiles ? SEED_ACTIVE : NO_ACTIVE)
+  const slug = (project?.name ?? 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  const seedActive = useMemo<Record<string, string>>(() => (seededFiles ? { 'Project Layout': `${slug}-layout.pdf`, 'Area Map': `${slug}-area-map.jpg` } : NO_ACTIVE), [id])
+  const [activeFiles, setActiveFiles] = usePersistent<Record<string, string>>(`project:${id}:active`, seedActive)
   const [inactive, setInactive] = usePersistent<Record<string, FileRow[]>>(`project:${id}:inactive`, NO_INACTIVE)
   const [issues, setIssues] = usePersistent<IssueRow[]>(`project:${id}:issues`, NO_ISSUES)
   const [history, setHistory] = usePersistent<HistoryRow[]>(`project:${id}:history`, NO_HISTORY)
-  const seeded = /^\d+$/.test(id)
-  const [ppr, setPpr] = usePersistent<PprRow[]>(`project:${id}:ppr`, seeded ? SEED_PPR : NO_PPR)
+  const seedPpr = useMemo<PprRow[]>(() => { const sub = seededFiles ? substations[(Number(id) * 2) % Math.max(1, substations.length)] : undefined; return sub ? [{ id: `p${id}`, substation: sub.name, createdBy: sub.createdBy, createdOn: sub.createdOn, updatedBy: sub.createdBy, updatedOn: sub.createdOn, active: true, fileName: `${sub.scada.toLowerCase()}-ppr.pdf` }] : NO_PPR }, [id])
+  const [ppr, setPpr] = usePersistent<PprRow[]>(`project:${id}:ppr`, seedPpr)
   const [desc, setDesc] = useState('')
   const [hDate, setHDate] = useState('')
   const [ptp, setPtp] = useState('')

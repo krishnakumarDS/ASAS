@@ -172,7 +172,7 @@ export default function PartyDetailPage({ kind }: { kind: Kind }) {
             rows={others.map((n) => ({ id: n, name: n }))} empty={`No linked ${other.toLowerCase()}.`}
             columns={[
               { header: `${other.slice(0, -1)}`, render: (r) => <strong>{r.name}</strong> },
-              { header: 'Created by', render: () => <span className="muted">Mariam Mohamed Alhosani</span> },
+              { header: 'Created by', render: (r) => <span className="muted">{(kind === 'consultant' ? devs : cons).find((x) => x.name === r.name)?.createdBy ?? '—'}</span> },
               { header: 'Smart Office', render: () => <StatusChip status="visible" label="true" /> },
             ]}
           />

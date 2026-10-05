@@ -12,7 +12,7 @@ const withTimeout = <T,>(p: Promise<T>, ms: number) =>
   Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Timed out waiting for the Power Platform host.')), ms))])
 
 /** Local-only identity so `npm run dev:web` (plain browser, no Power host) is still usable. Never used in a production build. */
-const DEV_USER: User = { id: 'dev-user', name: 'Venkat Reddy', email: 'venkat.reddy@dewa.gov.ae', role: 'Engineer', initials: 'VR' }
+const DEV_USER: User = { id: 'dev-user', name: 'Demo User', email: 'demo.user@example.com', role: 'Engineer', initials: 'DU' }
 
 /** Identity comes from the Power Platform host (the signed-in Entra ID user via
  * @microsoft/power-apps getContext) — there is no login form and nothing is persisted locally.

@@ -11,7 +11,6 @@ import { AiSearchBar, AppInput, DataTable, Pager, matchQuery, usePaged, useSort,
 import { newId, usePlots, useProjects } from '../data/store'
 import type { Plot } from '../data/mock'
 
-const SUGGEST = ['hidden plots', 'Al Wasl', 'AECOM', 'plots without consultant']
 
 export default function PlotsPage() {
   const navigate = useNavigate()
@@ -19,6 +18,7 @@ export default function PlotsPage() {
   const [projects] = useProjects()
   const [q, setQ] = useState('')
   const [ref, setRef] = useState('')
+  const SUGGEST = useMemo(() => ['hidden plots', rows[0]?.developer ?? '', rows.find((r) => r.consultant)?.consultant ?? '', 'plots without consultant'].filter(Boolean), []) // eslint-disable-line react-hooks/exhaustive-deps
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirm, setConfirm] = useState(false)
   const [upload, setUpload] = useState(false)
@@ -36,7 +36,7 @@ export default function PlotsPage() {
           <AppButton variant="outlined" startIcon={<Sparkles size={16} />} onClick={() => setUpload(true)}>AI upload</AppButton>
           <AppButton variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate('/plots/new')}>Add plot</AppButton>
         </>} />
-      <AiSearchBar value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Ask in plain words — e.g. “hidden plots for Al Wasl”" suggestions={SUGGEST} resultText={`${filtered.length} of ${rows.length} plots`} />
+      <AiSearchBar value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder={`Ask in plain words — e.g. “hidden plots for ${rows[0]?.developer ?? 'a developer'}”`} suggestions={SUGGEST} resultText={`${filtered.length} of ${rows.length} plots`} />
       <div className="card toolbar reveal-item" style={{ paddingBottom: 4 }}>
         <div className="toolbar-grid"><AppInput label="Maalem Dubai reference" placeholder="MP-00000-000" value={ref} onChange={(e) => { setRef(e.target.value); setPage(1) }} /></div>
       </div>

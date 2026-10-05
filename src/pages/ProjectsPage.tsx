@@ -12,7 +12,6 @@ import { fmtDate } from '../data/mock'
 import { newId, useProjects } from '../data/store'
 import type { Project } from '../data/projects'
 
-const SUGGEST = ['hidden projects', 'Al Wasl', 'Dubai Properties Group', 'visible']
 
 export default function ProjectsPage() {
   const navigate = useNavigate()
@@ -23,6 +22,7 @@ export default function ProjectsPage() {
   const [toDelete, setToDelete] = useState<Project | null>(null)
   const [upload, setUpload] = useState(false)
   const [toast, say] = useToast()
+  const SUGGEST = useMemo(() => ['hidden projects', rows[0]?.developer ?? '', rows[3]?.developer ?? '', 'visible'].filter(Boolean), []) // eslint-disable-line react-hooks/exhaustive-deps
   const consultantOf = (p: Project) => p.consultant ?? ''
 
   const filtered = useMemo(() => rows.filter((p) =>
@@ -39,7 +39,7 @@ export default function ProjectsPage() {
           <AppButton variant="outlined" startIcon={<Sparkles size={16} />} onClick={() => setUpload(true)}>AI upload</AppButton>
           <AppButton variant="contained" startIcon={<Plus size={17} />} onClick={() => navigate('/projects/new')}>Add project</AppButton>
         </>} />
-      <AiSearchBar value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Ask in plain words — e.g. “hidden projects by Al Wasl”" suggestions={SUGGEST} resultText={`${filtered.length} of ${rows.length} projects`} />
+      <AiSearchBar value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder={`Ask in plain words — e.g. “hidden projects by ${rows[0]?.developer ?? 'a developer'}”`} suggestions={SUGGEST} resultText={`${filtered.length} of ${rows.length} projects`} />
       <div className="card toolbar reveal-item" style={{ paddingBottom: 4 }}>
         <div className="toolbar-grid">
           <AppInput label="Developer name" placeholder="Filter by developer" value={dev} onChange={(e) => { setDev(e.target.value); setPage(1) }} />

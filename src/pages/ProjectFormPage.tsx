@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Ban, FolderOpen, Plus, Power, Save } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
@@ -10,7 +10,7 @@ import ProjectDiscussion from '../components/ProjectDiscussion'
 import { ActionsMenu, DataTable, LookupModal, Modal, PickField, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
 import { fmtDate } from '../data/mock'
 import type { Substation } from '../data/mock'
-import { newId, setStored, useConsultants, useDevelopers, usePersistent, useProjects, useSubstations } from '../data/store'
+import { newId, setStored, useConsultants, useDevelopers, usePersistent, usePlots, useProjects, useSubstations } from '../data/store'
 import { useAuth } from '../context/AuthContext'
 import type { Project } from '../data/projects'
 
@@ -20,17 +20,27 @@ const emptyValues: Values = {
   built: '0', underConstruction: '0', vacant: '0', engineer: '', assistantEngineer: '', developer: '', consultant: '', masterPlanStatus: '', siteSurveyor: '',
   corridors: '', ducts: '', hvNoc: '', ss132: '0', ss400: '0', category: '',
 }
+const pick = <T,>(arr: T[], n: number) => arr[n % arr.length]
+const ENG = ['KAM', 'FAS', 'OFA', 'YAM', 'SZ', 'RN']
+/** Deterministic, varied defaults for a seeded project (so the sample data isn't identical across projects). */
 const detailsFor = (p: Project): Values => {
+  const n = Number(p.id) || 1
   const [a, b, c] = p.maalemRef.split('-')
-  return { ...emptyValues, ref: c, maalemNumber: `${a}-${b}`, maalemRef: p.maalemRef, name: p.name, areaMap: 'Yes', areaMapRef: `17-${p.maalemRef}-${p.name.toUpperCase().slice(0, 8)}`, areaReport: 'Full', subZone: 'B_E',
-    engineer: 'LBN', assistantEngineer: 'SRN', developer: p.developer, consultant: p.consultant ?? '', masterPlanStatus: 'Approved', siteSurveyor: 'Yes', corridors: 'Approved', ducts: 'Approved', ss132: '1', category: 'ASAP' }
+  const built = pick([100, 80, 60, 45, 30, 0, 70, 90], n)
+  const under = Math.min(100 - built, pick([0, 10, 25, 35, 40, 50], n))
+  return { ...emptyValues, ref: c, maalemNumber: `${a}-${b}`, maalemRef: p.maalemRef, name: p.name, areaMap: n % 5 === 0 ? 'No' : 'Yes', areaMapRef: `17-${p.maalemRef}-${p.name.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 8)}`,
+    areaReport: pick(['Full', 'Partial', 'Pending'], n), zone: pick(['Zone 1', 'Zone 2', 'Zone 3'], n), subZone: pick(['B_E', 'A_N', 'C_S', 'D_W'], n + 1),
+    built: String(built), underConstruction: String(under), vacant: String(100 - built - under),
+    engineer: pick(ENG, n), assistantEngineer: pick(ENG, n + 2), developer: p.developer, consultant: p.consultant ?? '',
+    masterPlanStatus: pick(['Approved', 'Approved', 'Under review', 'Draft'], n), siteSurveyor: n % 3 ? 'Yes' : 'No',
+    corridors: pick(['Approved', 'Approved', 'Pending'], n), ducts: pick(['Approved', 'Pending', 'Approved'], n + 1),
+    hvNoc: n % 2 ? `HV-${1000 + n * 7}` : '', ss132: String(n % 3), ss400: n % 7 === 0 ? '1' : '0', category: pick(['ASAP', 'Residential', 'Commercial', 'Mixed use', 'Industrial'], n) }
 }
 const required = ['ref', 'maalemNumber', 'maalemRef', 'name', 'areaMap', 'areaReport', 'subZone', 'engineer', 'developer', 'masterPlanStatus', 'siteSurveyor', 'corridors', 'ducts', 'category']
 const opts = { areaReport: ['Full', 'Partial', 'Not available', 'Pending'], zone: ['Zone 1', 'Zone 2', 'Zone 3'], masterPlanStatus: ['Approved', 'Under review', 'Draft'], corridors: ['Approved', 'Pending', 'Not required'], category: ['ASAP', 'Residential', 'Commercial', 'Mixed use', 'Industrial'] }
 
 const LABELS: Record<string, string> = { ref: 'REF', maalemNumber: 'Maalem number', maalemRef: 'Maalem ref', name: 'Project name', areaMap: 'Area map', areaReport: 'Area report', subZone: 'Sub-zone', engineer: 'Engineer', developer: 'Developer', masterPlanStatus: 'Master plan status', siteSurveyor: 'Site surveyor', corridors: '11kV corridors', ducts: '11kV ducts', category: 'Category' }
 
-const SEED_EXISTING: SubRow[] = [{ id: 's1', name: 'Towers of Kifaf', status: 'Developer', createdOn: '2025-11-13T08:19:45', createdBy: 'Mariam Mohamed Alhosani', active: true, scada: 'TWRKIFAF' }]
 const NO_SUBS: SubRow[] = []
 const NO_REMARKS: Remark[] = []
 
@@ -46,6 +56,7 @@ export default function ProjectFormPage() {
   const [devs] = useDevelopers()
   const [cons] = useConsultants()
   const [allSubs] = useSubstations()
+  const [allPlots] = usePlots()
   const project = projects.find((p) => p.id === id)
   const [saved] = usePersistent<Values | null>(`project:${id}:details`, null)
   const isNew = id === 'new'
@@ -55,13 +66,17 @@ export default function ProjectFormPage() {
   const [tab, setTab] = useState('Project details')
   const [picker, setPicker] = useState<Picker>(null)
   const [toast, say] = useToast()
-  const [existing, setExisting] = usePersistent<SubRow[]>(`project:${id}:existing`, /^\d+$/.test(id) ? SEED_EXISTING : NO_SUBS)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const seedExisting = useMemo<SubRow[]>(() => { const sub = /^\d+$/.test(id) ? allSubs[(Number(id) * 3) % Math.max(1, allSubs.length)] : undefined; return sub ? [{ id: `s${id}`, name: sub.name, status: sub.builtBy, createdOn: sub.createdOn, createdBy: sub.createdBy, active: true, scada: sub.scada }] : NO_SUBS }, [id])
+  const [existing, setExisting] = usePersistent<SubRow[]>(`project:${id}:existing`, seedExisting)
   const [future, setFuture] = usePersistent<SubRow[]>(`project:${id}:future`, NO_SUBS)
   const [subModal, setSubModal] = useState<null | 'existing' | 'future'>(null)
   const [remarks, setRemarks] = usePersistent<Remark[]>(`project:${id}:remarks`, NO_REMARKS)
   const [remarkModal, setRemarkModal] = useState(false)
 
   const ro = !editable
+  const plotCount = allPlots.filter((x) => x.maalemRef === v.maalemRef).length
+  const tcl = Math.round(plotCount * (8 + (Number(id) % 7) * 3.1))
   const set = (k: string, val: string) => { setV((p) => ({ ...p, [k]: val })); setErrors((e) => { const n = new Set(e); n.delete(k); return n }) }
   const err = (k: string) => (errors.has(k) ? 'This field is required' : undefined)
   const text = (k: string, label: string, type?: string) => <TextField label={label} value={v[k]} type={type} required={required.includes(k)} error={err(k)} readOnly={ro} onChange={(x) => set(k, x)} />
@@ -134,7 +149,7 @@ export default function ProjectFormPage() {
             </Section>
             {!isNew && (
               <Section title="Totals" index={5}>
-                <div className="grid-auto"><TextField label="Total plots no" value="22" readOnly /><TextField label="Total TCL (MW)" value="327" readOnly /><TextField label="Total DCP (MW)" value="40" readOnly /></div>
+                <div className="grid-auto"><TextField label="Total plots no" value={String(plotCount)} readOnly /><TextField label="Total TCL (MW)" value={String(tcl)} readOnly /><TextField label="Total DCP (MW)" value={String(Math.round(tcl * 0.12))} readOnly /></div>
               </Section>
             )}
           </div>

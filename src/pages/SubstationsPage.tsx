@@ -10,11 +10,11 @@ import { fmtDate } from '../data/mock'
 import { newId, useSubstations } from '../data/store'
 import type { Substation } from '../data/mock'
 
-const SUGGEST = ['built by DEWA', 'Developer', 'hidden in smart office', 'Remraam']
 
 export default function SubstationsPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useSubstations()
+  const SUGGEST = useMemo(() => ['built by DEWA', 'Developer', 'hidden in smart office', rows[2]?.name ?? ''].filter(Boolean), []) // eslint-disable-line react-hooks/exhaustive-deps
   const [q, setQ] = useState('')
   const [upload, setUpload] = useState(false)
   const [toast, say] = useToast()

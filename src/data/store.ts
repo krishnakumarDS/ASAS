@@ -7,7 +7,7 @@ import type { Party, Plot, StandardLimit, Substation } from './mock'
 import { projects } from './projects'
 import type { Project } from './projects'
 
-const PREFIX = 'asas:v1:'
+const PREFIX = 'asas:v2:'
 const cache = new Map<string, unknown>()
 const subs = new Map<string, Set<() => void>>()
 
