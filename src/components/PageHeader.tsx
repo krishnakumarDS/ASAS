@@ -15,7 +15,7 @@ export default function PageHeader({ title, subtitle, actions, back = true, badg
         <div className="row" style={{ gap: 12, minWidth: 0 }}>
           {back && <IconButton onClick={() => navigate(-1)} aria-label="Back" style={{ border: '1px solid var(--border-light)', background: 'var(--bg-secondary)' }}><ArrowLeft size={18} /></IconButton>}
           <div style={{ minWidth: 0 }}>
-            <div className="row wrap" style={{ gap: 10 }}><h1 style={{ fontSize: 'clamp(22px, 2.4vw, 28px)' }}>{title}</h1>{badge}</div>
+            <div className="row wrap" style={{ gap: 10 }}><h1 style={{ fontSize: 'clamp(22px, calc(2.4 * var(--vw)), 28px)' }}>{title}</h1>{badge}</div>
             {subtitle && <p className="muted" style={{ marginTop: 2 }}>{subtitle}</p>}
           </div>
         </div>

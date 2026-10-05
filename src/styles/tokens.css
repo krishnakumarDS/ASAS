@@ -58,12 +58,17 @@
   --transition-fast: 120ms ease;
   --transition-base: 220ms cubic-bezier(0.4, 0, 0.2, 1);
 
+  /* Zoom-safe viewport units (see styles/scale.ts) */
+  --zoom: 1;
+  --vw: calc(1vw / var(--zoom));
+  --vh: calc(1vh / var(--zoom));
+
   /* Layout */
   --header-height: 52px;
-  --sidebar-collapsed: clamp(68px, 6vw, 82px);
-  --sidebar-expanded: clamp(240px, 20vw, 296px);
-  --content-pad-y: clamp(16px, 2vw, 28px);
-  --content-pad-x: clamp(12px, 2vw, 32px);
+  --sidebar-collapsed: clamp(68px, calc(6 * var(--vw)), 82px);
+  --sidebar-expanded: clamp(240px, calc(20 * var(--vw)), 296px);
+  --content-pad-y: clamp(16px, calc(2 * var(--vw)), 28px);
+  --content-pad-x: clamp(12px, calc(2 * var(--vw)), 32px);
 
   /* Form fields */
   --input-bg: #ffffff;

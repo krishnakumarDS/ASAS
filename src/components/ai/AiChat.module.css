@@ -1,7 +1,7 @@
 .fab { position: fixed; right: 24px; bottom: 24px; z-index: 900; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--accent-500), var(--accent-700)); box-shadow: var(--shadow-lg); transition: transform var(--transition-base); }
 :global(html.dark) .fab { color: #04201b; }
 .fab:hover { transform: translateY(-3px) scale(1.05); }
-.panel { position: fixed; right: 24px; bottom: 24px; z-index: 900; width: min(400px, calc(100vw - 32px)); height: min(580px, calc(100vh - 48px)); display: flex; flex-direction: column; background: var(--bg-elevated); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); overflow: hidden; animation: modalIn 240ms var(--transition-base); }
+.panel { position: fixed; right: 24px; bottom: 24px; z-index: 900; width: min(400px, calc(calc(100 * var(--vw)) - 32px)); height: min(580px, calc(calc(100 * var(--vh)) - 48px)); display: flex; flex-direction: column; background: var(--bg-elevated); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); overflow: hidden; animation: modalIn 240ms var(--transition-base); }
 .head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border-light); background: linear-gradient(135deg, var(--accent-50), var(--bg-elevated)); }
 .head small { display: block; color: var(--text-tertiary); font-size: 11px; }
 .badge { width: 32px; height: 32px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--accent-600); background: var(--bg-secondary); border: 1px solid var(--accent-100); }

@@ -27,8 +27,8 @@ import EmptyState from './components/common/EmptyState'
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading, error } = useAuth()
   const loc = useLocation()
-  if (loading) return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}><span className="spinner" style={{ width: 28, height: 28, color: 'var(--accent-600)' }} aria-label="Loading" /></div>
-  if (!user) return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16 }}><EmptyState title="Unable to determine the signed-in user" description={error ?? 'Open this app through the Power Platform player.'} /></div>
+  if (loading) return <div style={{ minHeight: 'calc(100 * var(--vh))', display: 'grid', placeItems: 'center' }}><span className="spinner" style={{ width: 28, height: 28, color: 'var(--accent-600)' }} aria-label="Loading" /></div>
+  if (!user) return <div style={{ minHeight: 'calc(100 * var(--vh))', display: 'grid', placeItems: 'center', padding: 16 }}><EmptyState title="Unable to determine the signed-in user" description={error ?? 'Open this app through the Power Platform player.'} /></div>
   if (!hasEnteredThisLoad()) return <Navigate to="/login" replace state={{ from: loc.pathname + loc.search }} />
   return <>{children}</>
 }

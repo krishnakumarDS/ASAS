@@ -1,6 +1,6 @@
 .kpi { display: flex; justify-content: space-between; gap: 12px; padding: 18px 20px; border-left: 4px solid var(--tone); min-height: 112px; }
 .text { min-width: 0; }
-.value { font-size: clamp(28px, 2.4vw, 36px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.value { font-size: clamp(28px, calc(2.4 * var(--vw)), 36px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .value small { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 6px; letter-spacing: 0; }
 .meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; font-size: 12px; }
 .trend { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: var(--radius-sm); font-weight: 700; }
