@@ -116,7 +116,7 @@ export default function LoginPage() {
         </section>
       </main>
 
-      <footer className={styles.foot}>© {new Date().getFullYear()} Dubai Electricity &amp; Water Authority (PJSC)</footer>
+      <footer className={styles.foot}>© {new Date().getFullYear()} Dubai Electricity &amp; Water Authority</footer>
     </div>
   )
 }

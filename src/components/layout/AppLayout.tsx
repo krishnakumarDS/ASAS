@@ -130,7 +130,7 @@ export default function AppLayout() {
         <main className={styles.content} id="main"><Outlet key={refreshKey} /></main>
         <AiChat />
         <ConfirmationDialog open={reset} title="Reset local data" message="This removes everything you added or changed in this browser and restores the sample data." confirmLabel="Reset" destructive onConfirm={() => { clearStored(); window.location.reload() }} onClose={() => setReset(false)} />
-        <footer className={styles.footer}><span>© {new Date().getFullYear()} Dubai Electricity &amp; Water Authority (PJSC)</span><span>ASAS Search Engine Portal</span></footer>
+        <footer className={styles.footer}><span>© {new Date().getFullYear()} Dubai Electricity &amp; Water Authority</span><span>ASAS Search Engine Portal</span></footer>
       </div>
     </div>
   )
