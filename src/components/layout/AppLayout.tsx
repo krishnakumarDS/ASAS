@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, RotateCcw, Sparkles, Bell, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
+import { RefreshCw, RotateCcw, Bell, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { DEWA_LOGO_WHITE } from '../../assets/logos'
 import { NAV_GROUPS } from '../../constants/navigation'
 import { useAuth } from '../../context/AuthContext'
-import { exceeding } from '../../data/dashboard'
+import { fmtDate } from '../../data/mock'
 import { clearStored, refreshStored, snapshot } from '../../data/store'
 import { markLeft } from '../../data/session'
+import { useApiBusy } from '../../data/api'
+import { startSync, syncFromDatabase, useDataReady, useSyncStatus } from '../../data/sync'
+import { PageLoader, Spinner } from '../Loader'
 import { useTheme } from '../../context/ThemeContext'
-import AiChat, { openChat } from '../ai/AiChat'
 import ConfirmationDialog from '../common/ConfirmationDialog'
 import IconButton from '../common/IconButton'
 import { useOutsideClose } from '../ui'
@@ -18,6 +20,9 @@ import styles from './AppLayout.module.css'
 export default function AppLayout() {
   const { user } = useAuth()
   const { dark, toggle } = useTheme()
+  const sync = useSyncStatus()
+  const ready = useDataReady()
+  const busy = useApiBusy()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [hover, setHover] = useState(false)
@@ -26,12 +31,15 @@ export default function AppLayout() {
   const [bell, setBell] = useState(false)
   const notifications = useMemo(() => {
     const pr = snapshot.projects(), pl = snapshot.plots()
+    const withPlots = new Set(pl.map((p) => p.maalemRef))
+    const noPlots = pr.filter((p) => !withPlots.has(p.maalemRef)).length
+    const latest = [...pr].sort((a, b) => b.createdOn.localeCompare(a.createdOn))[0]
     return [
-      { id: 1, text: `${exceeding.length} submissions are exceeding KPI`, time: '10 min ago' },
-      { id: 2, text: `New project added: ${pr[0]?.name ?? 'Project'}`, time: '1 h ago' },
-      { id: 3, text: `Plot upload completed for ${pl[0]?.projectName ?? 'a project'}`, time: 'Yesterday' },
+      { id: 1, text: `${noPlots} project${noPlots === 1 ? ' has' : 's have'} no plots`, time: 'Now' },
+      { id: 2, text: latest ? `Latest project: ${latest.name}` : 'No projects yet', time: latest ? fmtDate(latest.createdOn) : '' },
+      { id: 3, text: `${pr.filter((p) => !p.display).length} hidden projects`, time: 'Now' },
     ]
-  }, [])
+  }, [sync.at])
   const [menu, setMenu] = useState(false)
   const [q, setQ] = useState('')
   const [reset, setReset] = useState(false)
@@ -41,12 +49,15 @@ export default function AppLayout() {
     if (spin) return
     setSpin(true)
     refreshStored()
+    void syncFromDatabase(true) // Refresh: load all the lists again
     setRefreshKey((k) => k + 1)
     setTimeout(() => setSpin(false), 700)
   }
   const bellRef = useOutsideClose(() => setBell(false))
   const menuRef = useOutsideClose(() => setMenu(false))
   useEffect(() => setOpen(false), [pathname])
+  // Opening the app: use the lists stored in this browser; only the first visit (or a Reset) loads them from the server.
+  useEffect(() => { if (user) void startSync(user.id) }, [user])
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 961px)')
     const h = () => setDesktop(mq.matches)
@@ -69,14 +80,10 @@ export default function AppLayout() {
           {NAV_GROUPS.map((g) => (
             <div key={g.id} className={styles.group}>
               <div className={styles.groupTitle}>{g.label}</div>
-              {g.items.map(({ id, label, icon: Icon, path, action }) => path ? (
+              {g.items.map(({ id, label, icon: Icon, path }) => (
                 <NavLink key={id} to={path} end={path === '/'} title={label} className={`${styles.item} ${isActive(path) ? styles.active : ''}`} aria-current={isActive(path) ? 'page' : undefined}>
                   <Icon size={19} /><span className={styles.label}>{label}</span>
                 </NavLink>
-              ) : (
-                <button key={id} title={label} className={styles.item} style={{ width: '100%', textAlign: 'left' }} onClick={() => { if (action === 'chat') { openChat(); setOpen(false) } }}>
-                  <Icon size={19} /><span className={styles.label}>{label}</span>
-                </button>
               ))}
             </div>
           ))}
@@ -98,8 +105,9 @@ export default function AppLayout() {
             <input className="input" placeholder="Search projects, plots, developers…" aria-label="Global search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && q.trim()) { navigate('/projects'); setQ('') } }} />
           </div>
           <span className={styles.spacer} />
+          {busy && <Spinner size={18} />}
+          {sync.state === 'offline' && <button type="button" className="badge badge-warning" onClick={() => void syncFromDatabase(true)} title="Try again">Offline · Retry</button>}
           <IconButton onClick={refresh} aria-label="Refresh" title="Refresh"><RefreshCw size={18} className={spin ? styles.spinning : ''} /></IconButton>
-          <IconButton onClick={() => openChat()} aria-label="AI assistant" title="AI assistant"><Sparkles size={18} /></IconButton>
           <IconButton onClick={toggle} aria-label="Toggle theme" title={dark ? 'Light mode' : 'Dark mode'}>{dark ? <Sun size={18} /> : <Moon size={18} />}</IconButton>
           <div className="menu" ref={bellRef}>
             <IconButton onClick={() => setBell(!bell)} aria-label="Notifications" aria-expanded={bell}><Bell size={18} /><i className={styles.dot} /></IconButton>
@@ -127,9 +135,8 @@ export default function AppLayout() {
             )}
           </div>
         </header>
-        <main className={styles.content} id="main"><Outlet key={refreshKey} /></main>
-        <AiChat />
-        <ConfirmationDialog open={reset} title="Reset local data" message="This removes everything you added or changed in this browser and restores the sample data." confirmLabel="Reset" destructive onConfirm={() => { clearStored(); window.location.reload() }} onClose={() => setReset(false)} />
+        <main className={styles.content} id="main">{ready ? <Outlet key={refreshKey} /> : <PageLoader />}</main>
+        <ConfirmationDialog open={reset} title="Reset local data" message="This clears what is saved in this browser and reloads the latest data." confirmLabel="Reset" destructive onConfirm={() => { clearStored(); window.location.reload() }} onClose={() => setReset(false)} />
         <footer className={styles.footer}><span>© {new Date().getFullYear()} Dubai Electricity &amp; Water Authority</span><span>ASAS Search Engine Portal</span></footer>
       </div>
     </div>

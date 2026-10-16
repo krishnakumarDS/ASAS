@@ -14,6 +14,7 @@ import ProjectFilesPage from './pages/ProjectFilesPage'
 import ProjectFormPage from './pages/ProjectFormPage'
 import ProjectsPage from './pages/ProjectsPage'
 import IntegrationsPage from './pages/IntegrationsPage'
+import FlowTestPage from './pages/FlowTestPage'
 import NetworkPage from './pages/NetworkPage'
 import ReportsPage from './pages/ReportsPage'
 import TrendsPage from './pages/TrendsPage'
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="trends" element={<TrendsPage />} />
           <Route path="network" element={<NetworkPage />} />
           <Route path="integrations" element={<IntegrationsPage />} />
+          {import.meta.env.DEV && <Route path="flow-test" element={<FlowTestPage />} />}
           <Route path="*" element={<EmptyState title="Page not found" description="The page you’re looking for doesn’t exist." />} />
         </Route>
       </Routes>

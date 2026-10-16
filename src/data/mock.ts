@@ -1,6 +1,6 @@
 export interface Substation { id: string; name: string; scada: string; builtBy: 'DEWA' | 'Developer'; showInSO: boolean; createdOn: string; createdBy: string; limit?: string }
 export interface Party { id: string; name: string; createdBy: string; createdOn: string; url: string; showInSO: boolean }
-export interface Plot { id: string; maalemRef: string; projectName: string; devPlot: string; dmPlot: string; developer: string; consultant: string; display: boolean }
+export interface Plot { id: string; maalemRef: string; projectName: string; devPlot: string; dmPlot: string; developer: string; consultant: string; display: boolean; createdOn?: string }
 export interface StandardLimit { id: string; amount: string; description: string; showInSO: boolean; createdOn: string; createdBy: string }
 
 // Generated sample data (fictional names and numbers).

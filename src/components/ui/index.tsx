@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Sparkles, ChevronLeft, ChevronRight, MoreVertical, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, MoreVertical, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
 import AppButton from '../common/AppButton'
 import EmptyState from '../common/EmptyState'
 import IconButton from '../common/IconButton'
@@ -172,13 +172,22 @@ export function usePaged<T>(rows: T[], size = 8) {
   return { visible: rows.slice((current - 1) * size, current * size), page: current, pages, setPage, total: rows.length }
 }
 
+/** Page numbers to show: first, last and a window around the current page, with … for the gaps (keeps the pager short for thousands of rows). */
+function pageWindow(page: number, pages: number): (number | '…')[] {
+  const keep = new Set([1, 2, pages - 1, pages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pages))
+  const out: (number | '…')[] = []
+  let prev = 0
+  for (const n of [...keep].sort((a, b) => a - b)) { if (n - prev > 1) out.push('…'); out.push(n); prev = n }
+  return out
+}
+
 export function Pager({ page, pages, setPage }: { page: number; pages: number; setPage: (n: number) => void }) {
   return (
     <div className="table-footer">
       <span>Page {page} of {pages}</span>
       <div className="pager">
         <button disabled={page <= 1} onClick={() => setPage(page - 1)} aria-label="Previous page"><ChevronLeft size={16} /></button>
-        {Array.from({ length: pages }, (_, i) => i + 1).map((n) => <button key={n} className={n === page ? 'on' : ''} onClick={() => setPage(n)} aria-current={n === page ? 'page' : undefined}>{n}</button>)}
+        {pageWindow(page, pages).map((n, i) => n === '…' ? <span key={`gap${i}`} className="faint" aria-hidden>…</span> : <button key={n} className={n === page ? 'on' : ''} onClick={() => setPage(n)} aria-current={n === page ? 'page' : undefined}>{n}</button>)}
         <button disabled={page >= pages} onClick={() => setPage(page + 1)} aria-label="Next page"><ChevronRight size={16} /></button>
       </div>
     </div>
@@ -244,7 +253,7 @@ export function useSort<T>(rows: T[], getters: Record<string, (r: T) => string |
   return { sorted, sortFor }
 }
 
-/* ---------- smart (natural-language) search ---------- */
+/* ---------- text search ---------- */
 const STOP = new Set(['show', 'me', 'all', 'find', 'list', 'the', 'of', 'for', 'with', 'in', 'a', 'an', 'and', 'by', 'who', 'which', 'are', 'is', 'that', 'have', 'has', 'get', 'give', 'display'])
 /** Words naming the list itself ("hidden projects") are optional — they only count if they actually appear in the row. */
 const ENTITY = new Set(['project', 'plot', 'substation', 'developer', 'consultant', 'record', 'item', 'result'])
@@ -254,18 +263,15 @@ export function matchQuery(text: string, query: string) {
   return query.toLowerCase().split(/[\s,]+/).filter((w) => w && !STOP.has(w)).every((w) => t.includes(w) || ENTITY.has(w.replace(/s$/, '')))
 }
 
-export function AiSearchBar({ value, onChange, placeholder, suggestions = [], resultText }: { value: string; onChange: (v: string) => void; placeholder: string; suggestions?: string[]; resultText?: string }) {
+export function SearchBar({ value, onChange, placeholder, resultText }: { value: string; onChange: (v: string) => void; placeholder: string; resultText?: string }) {
   return (
-    <div className="card toolbar ai-search reveal-item">
-      <div className="ai-input">
-        <Sparkles size={18} className="ai-ico" />
-        <input className="input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label="Smart search" />
+    <div className="card toolbar reveal-item">
+      <div className="search-input">
+        <Search size={18} className="search-ico" />
+        <input className="input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label="Search" />
         {value && <IconButton small onClick={() => onChange('')} aria-label="Clear search"><X size={16} /></IconButton>}
       </div>
-      <div className="row wrap" style={{ gap: 8, marginTop: 10 }}>
-        {resultText && <span className="faint" style={{ fontSize: 12, marginRight: 4 }}>{resultText}</span>}
-        {suggestions.map((s) => <button key={s} type="button" className="chip" onClick={() => onChange(s)}>{s}</button>)}
-      </div>
+      {resultText && <div className="row wrap" style={{ gap: 8, marginTop: 10 }}><span className="faint" style={{ fontSize: 12 }}>{resultText}</span></div>}
     </div>
   )
 }

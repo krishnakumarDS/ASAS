@@ -66,7 +66,7 @@ export default function LoginPage() {
             Every major project,<br /><em>one intelligent view.</em>
           </h1>
           <p className={`${styles.lede} reveal-item`} style={{ ['--index' as string]: 2 }}>
-            ASAS brings projects, plots, substations, developers and consultants together with live KPIs and AI-assisted reviews — so engineers decide faster, with the full picture.
+            ASAS brings projects, plots, substations, developers and consultants together with live KPIs — so engineers decide faster, with the full picture.
           </p>
           <div className={`${styles.cta} reveal-item`} style={{ ['--index' as string]: 3 }}>
             <AppButton variant="contained" size="large" loading={loading} disabled={!user} onClick={start} endIcon={!loading ? <ArrowRight size={18} /> : undefined} autoFocus>Get Started</AppButton>

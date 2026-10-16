@@ -1,10 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ImageIcon, Pencil, Plus, Save, Search, Upload } from 'lucide-react'
+import { ArrowLeft, ImageIcon, Pencil, Plus, Save, Search, Trash2, Upload } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
+import ConfirmationDialog from '../components/common/ConfirmationDialog'
 import Section from '../components/common/Section'
 import PageHeader from '../components/PageHeader'
 import StatusChip from '../components/common/StatusChip'
+import RemoteBadge from '../components/RemoteBadge'
+import { callApi } from '../data/api'
+import { userMessage } from '../data/api'
+import { deleteRecord, setActiveRecord } from '../data/write'
+import { loadParty } from '../data/details'
+import { useRemote } from '../data/remote'
+import { syncEntity, useSyncStatus } from '../data/sync'
 import { ActionsMenu, DataTable, Modal, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
 import { fmtDate } from '../data/mock'
 import type { Party } from '../data/mock'
@@ -24,10 +32,9 @@ export default function PartyDetailPage({ kind }: { kind: Kind }) {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [projects] = useProjects()
-  const [devs, setDevs] = useDevelopers()
-  const [cons, setCons] = useConsultants()
+  const [devs] = useDevelopers()
+  const [cons] = useConsultants()
   const list: Party[] = kind === 'developer' ? devs : cons
-  const setList = kind === 'developer' ? setDevs : setCons
   const party = list.find((p) => p.id === id)
   const isNew = !party
   const [edit, setEdit] = useState(isNew)
@@ -53,33 +60,74 @@ export default function PartyDetailPage({ kind }: { kind: Kind }) {
   const [fBy, setFBy] = useState('')
   const [toast, say] = useToast()
 
+  // Opening a developer/consultant calls the flow for its profile, issues, projects and totals.
+  const live = useSyncStatus().state === 'live'
+  const remote = useRemote(party && live ? party.id : null, () => loadParty(kind, id))
+  useEffect(() => {
+    const d = remote.data
+    if (!d) return
+    if (d.url) setUrl(d.url)
+    setStored(`party:${kind}:${id}:issues`, d.issues)
+  }, [remote.data, kind, id])
+  const totals = remote.data?.totals
+
   const related = projects.filter((p) => (kind === 'consultant' ? p.consultant === name : p.developer.split(' (')[0] === name.split(' (')[0] || p.developer === name))
   const others = [...new Set(related.map((p) => (kind === 'consultant' ? p.developer : p.consultant)).filter(Boolean))]
   const tabs = isNew ? ['Main details'] : edit ? ['Main details', 'Issues'] : ['Main details', 'Issues', 'Projects', other]
   const match = (a: string, b: string) => a.toLowerCase().includes(b.toLowerCase())
-  const save = () => {
+  const [busy, setBusy] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  // Restore: show a deleted (inactive) record again (developer.setActive / consultant.setActive).
+  const restore = async () => {
+    if (!live) { say('The server can’t be reached right now: nothing was changed. Please try again.'); return }
+    setBusy(true)
+    try { await setActiveRecord(kind, id, true, user?.name); await syncEntity(kind === 'developer' ? 'developers' : 'consultants'); setShow('Yes'); say(`${m.one} restored`) }
+    catch (e) { say(userMessage(e, 'Could not restore')) }
+    setBusy(false)
+  }
+  // Delete writes to SQL (developer.delete / consultant.delete): the row is hidden (IsActive = 0), not removed.
+  const remove = async () => {
+    if (!live) { say('The server can’t be reached right now: nothing was changed. Please try again.'); return }
+    setBusy(true)
+    try { await deleteRecord(kind, id, user?.name); await syncEntity(kind === 'developer' ? 'developers' : 'consultants'); say(`${m.one} deleted (hidden)`); setTimeout(() => navigate(m.path), 700) }
+    catch (e) { say(userMessage(e, 'Could not delete')) }
+    setBusy(false)
+  }
+  // Save writes to SQL through the flow (developer.create / developer.update, consultant.create / consultant.update), then reloads the lists.
+  const save = async () => {
     setSubmitted(true)
     if (!name.trim()) return
-    if (isNew) {
-      const nid = newId()
-      setList((l) => [{ id: nid, name: name.trim(), createdBy: user?.name ?? 'Unknown', createdOn: new Date().toISOString(), url, showInSO: show === 'Yes' }, ...l])
-      if (pendingImage) setStored(`party:${kind}:${nid}:image`, pendingImage)
-    } else {
-      setList((l) => l.map((x) => (x.id === id ? { ...x, name: name.trim(), url, showInSO: show === 'Yes' } : x)))
-      if (pendingImage) setStored(`party:${kind}:${id}:image`, pendingImage)
-      setPendingImage(null)
+    if (!live) { say('The server can’t be reached right now: nothing was saved. Please try again.'); return }
+    const fields = {
+      [kind === 'developer' ? 'developerName' : 'consultantName']: name.trim(),
+      [kind === 'developer' ? 'developerURL' : 'consultantURL']: url.trim() || null,
+      ...(show ? { isActive: show === 'Yes' } : {}),
+      user: user?.name || user?.email,
     }
-    say(`${m.one} saved`)
-    setTimeout(() => (isNew ? navigate(m.path) : setEdit(false)), 700)
+    setBusy(true)
+    try {
+      const res = await callApi(`${kind}.${isNew ? 'create' : 'update'}`, isNew ? fields : { id, ...fields })
+      // The logo is a Documentum file and is not stored in SQL here: it stays in this browser only.
+      if (pendingImage) setStored(`party:${kind}:${isNew ? String(res[0]?.[0]?.Id ?? id) : id}:image`, pendingImage)
+      setPendingImage(null)
+      await syncEntity(kind === 'developer' ? 'developers' : 'consultants')
+      say(`${m.one} saved`)
+      setTimeout(() => (isNew ? navigate(m.path) : setEdit(false)), 700)
+    } catch (e) {
+      say(userMessage(e, 'Could not save'))
+    }
+    setBusy(false)
   }
   const initials = name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?'
 
   return (
     <div className="page">
-      <PageHeader title={isNew ? `New ${m.one.toLowerCase()}` : name} subtitle={isNew ? undefined : `${m.one} · created ${fmtDate(party?.createdOn ?? '')}`} actions={
+      <PageHeader badge={!isNew && <RemoteBadge state={remote} />} title={isNew ? `New ${m.one.toLowerCase()}` : name} subtitle={isNew ? undefined : `${m.one} · created ${fmtDate(party?.createdOn ?? '')}`} actions={
         <>
           <AppButton variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(m.path)}>Back</AppButton>
-          {edit ? <AppButton variant="contained" startIcon={<Save size={16} />} onClick={save}>Save</AppButton>
+          {!isNew && !edit && show === 'Yes' && <AppButton variant="outlined" color="error" startIcon={<Trash2 size={16} />} onClick={() => setConfirmDelete(true)}>Delete</AppButton>}
+          {!isNew && !edit && show === 'No' && <AppButton variant="contained" loading={busy} onClick={restore}>Restore</AppButton>}
+          {edit ? <AppButton variant="contained" loading={busy} startIcon={<Save size={16} />} onClick={save}>Save</AppButton>
             : <AppButton variant="contained" startIcon={<Pencil size={16} />} onClick={() => setEdit(true)}>Edit</AppButton>}
         </>
       } />
@@ -151,9 +199,9 @@ export default function PartyDetailPage({ kind }: { kind: Kind }) {
         {tab === 'Projects' && (
           <div>
             <div className="card-body"><div className="stats">
-              <div className="stat"><small>Total plots</small><strong>{related.length * 11}</strong></div>
-              <div className="stat"><small>Total TCL (MW)</small><strong>{(related.length * 612.4).toLocaleString('en', { maximumFractionDigits: 2 })}</strong></div>
-              <div className="stat"><small>Total DCP (MW)</small><strong>{(related.length * 20).toFixed(2)}</strong></div>
+              <div className="stat"><small>Total plots</small><strong>{totals?.plots ?? related.length * 11}</strong></div>
+              <div className="stat"><small>Total TCL (MW)</small><strong>{(totals?.tcl ?? related.length * 612.4).toLocaleString('en', { maximumFractionDigits: 2 })}</strong></div>
+              <div className="stat"><small>Total DCP (MW)</small><strong>{(totals?.dcp ?? related.length * 20).toFixed(2)}</strong></div>
             </div></div>
             <DataTable
               rows={related} empty="No linked projects."
@@ -180,6 +228,7 @@ export default function PartyDetailPage({ kind }: { kind: Kind }) {
       </div>
 
       {issueModal && <IssueModal refs={related.map((p) => p.maalemRef)} onClose={() => setIssueModal(false)} onSave={(i) => { const p = projects.find((x) => x.maalemRef === i.ref); setIssues((prev) => [...prev, { ...i, id: newId(), project: p?.name ?? '' }]); setIssueModal(false); say('Issue added') }} />}
+      <ConfirmationDialog open={confirmDelete} title={`Delete ${m.one.toLowerCase()}`} message={`Delete “${name}”? It is hidden (set inactive) and can be shown again.`} confirmLabel="Delete" destructive onConfirm={remove} onClose={() => setConfirmDelete(false)} />
       {toast}
     </div>
   )

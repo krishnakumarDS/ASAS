@@ -30,7 +30,7 @@ export default function NetworkPage() {
       <PageHeader title="Network & heatmaps" subtitle="11kV network model and project-connected heatmaps" back={false} badge={<span className="badge badge-warning">Sample data</span>} />
       <p className="faint" style={{ marginBottom: 14, fontSize: 13 }}>Illustrative layout and values. Live data arrives once the GIS and TMS integrations are connected.</p>
       <div className="card" style={{ overflow: 'hidden' }}>
-        <Tabs tabs={['Network model', 'AI heatmap']} active={tab} onChange={setTab} />
+        <Tabs tabs={['Network model', 'Heatmap']} active={tab} onChange={setTab} />
         {tab === 'Network model' ? (
           <div className="card-body">
             <div className={styles.model}>

@@ -1,12 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Ban, FolderOpen, Plus, Power, Save } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import Section from '../components/common/Section'
 import StatusChip from '../components/common/StatusChip'
 import PageHeader from '../components/PageHeader'
-import ProjectAiReview, { reviewProject } from '../components/ProjectAiReview'
 import ProjectDiscussion from '../components/ProjectDiscussion'
+import RemoteBadge from '../components/RemoteBadge'
+import { loadProject } from '../data/details'
+import { userMessage } from '../data/api'
+import { saveRecord } from '../data/write'
+import { useRemote } from '../data/remote'
+import { syncEntity, useSyncStatus } from '../data/sync'
 import { ActionsMenu, DataTable, LookupModal, Modal, PickField, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
 import { fmtDate } from '../data/mock'
 import type { Substation } from '../data/mock'
@@ -39,7 +44,6 @@ const detailsFor = (p: Project): Values => {
 const required = ['ref', 'maalemNumber', 'maalemRef', 'name', 'areaMap', 'areaReport', 'subZone', 'engineer', 'developer', 'masterPlanStatus', 'siteSurveyor', 'corridors', 'ducts', 'category']
 const opts = { areaReport: ['Full', 'Partial', 'Not available', 'Pending'], zone: ['Zone 1', 'Zone 2', 'Zone 3'], masterPlanStatus: ['Approved', 'Under review', 'Draft'], corridors: ['Approved', 'Pending', 'Not required'], category: ['ASAP', 'Residential', 'Commercial', 'Mixed use', 'Industrial'] }
 
-const LABELS: Record<string, string> = { ref: 'REF', maalemNumber: 'Maalem number', maalemRef: 'Maalem ref', name: 'Project name', areaMap: 'Area map', areaReport: 'Area report', subZone: 'Sub-zone', engineer: 'Engineer', developer: 'Developer', masterPlanStatus: 'Master plan status', siteSurveyor: 'Site surveyor', corridors: '11kV corridors', ducts: '11kV ducts', category: 'Category' }
 
 const NO_SUBS: SubRow[] = []
 const NO_REMARKS: Remark[] = []
@@ -52,7 +56,7 @@ export default function ProjectFormPage() {
   const { id = 'new' } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [projects, setProjects] = useProjects()
+  const [projects] = useProjects()
   const [devs] = useDevelopers()
   const [cons] = useConsultants()
   const [allSubs] = useSubstations()
@@ -60,7 +64,9 @@ export default function ProjectFormPage() {
   const project = projects.find((p) => p.id === id)
   const [saved] = usePersistent<Values | null>(`project:${id}:details`, null)
   const isNew = id === 'new'
-  const [v, setV] = useState<Values>(isNew || !project ? emptyValues : (saved ?? detailsFor(project)))
+  // Projects loaded from SQL have a non-numeric id (the Maalem reference): start from what the list knows, not from generated sample values.
+  const fromDb = !isNew && !/^\d+$/.test(id)
+  const [v, setV] = useState<Values>(isNew || !project ? emptyValues : fromDb ? { ...emptyValues, maalemRef: project.maalemRef, name: project.name, developer: project.developer, consultant: project.consultant ?? '' } : (saved ?? detailsFor(project)))
   const [editable, setEditable] = useState(isNew)
   const [errors, setErrors] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState('Project details')
@@ -74,41 +80,72 @@ export default function ProjectFormPage() {
   const [remarks, setRemarks] = usePersistent<Remark[]>(`project:${id}:remarks`, NO_REMARKS)
   const [remarkModal, setRemarkModal] = useState(false)
 
+  // Opening a project calls the flow for its details, substations, remarks and totals.
+  const remote = useRemote(fromDb ? id : null, () => loadProject(id))
+  useEffect(() => {
+    const d = remote.data
+    if (!d) return
+    setV((p) => ({ ...p, ...d.values }))
+    setStored(`project:${id}:existing`, d.existing)
+    setStored(`project:${id}:future`, d.future)
+    setStored(`project:${id}:remarks`, d.remarks)
+  }, [remote.data, id])
+  const totals = remote.data?.totals
+
   const ro = !editable
   const plotCount = allPlots.filter((x) => x.maalemRef === v.maalemRef).length
   const tcl = Math.round(plotCount * (8 + (Number(id) % 7) * 3.1))
   const set = (k: string, val: string) => { setV((p) => ({ ...p, [k]: val })); setErrors((e) => { const n = new Set(e); n.delete(k); return n }) }
   const err = (k: string) => (errors.has(k) ? 'This field is required' : undefined)
   const text = (k: string, label: string, type?: string) => <TextField label={label} value={v[k]} type={type} required={required.includes(k)} error={err(k)} readOnly={ro} onChange={(x) => set(k, x)} />
-  const sel = (k: string, label: string, o: string[]) => <SelectField label={label} value={v[k]} options={o} required={required.includes(k)} error={err(k)} disabled={ro} onChange={(x) => set(k, x)} />
+  const sel = (k: string, label: string, o: string[]) => <SelectField label={label} value={v[k]} options={v[k] && !o.includes(v[k]) ? [...o, v[k]] : o} required={required.includes(k)} error={err(k)} disabled={ro} onChange={(x) => set(k, x)} />
   const rad = (k: string, label: string) => <RadioField label={label} value={v[k]} required={required.includes(k)} error={err(k)} disabled={ro} onChange={(x) => set(k, x)} />
 
-  const save = () => {
+  const live = useSyncStatus().state === 'live'
+  const [saving, setSaving] = useState(false)
+  // Save writes to SQL through the flow (project.create / project.update), links the consultant, then reloads the lists.
+  const save = async () => {
     const missing = new Set(required.filter((k) => !v[k].trim()))
     setErrors(missing)
     if (missing.size) { say('Please fill the required fields'); return }
-    const row = { maalemRef: v.maalemRef, name: v.name, developer: v.developer, consultant: v.consultant }
-    if (isNew) {
-      const nid = newId()
-      setProjects((l) => [{ id: nid, ...row, createdBy: user?.name ?? 'Unknown', createdOn: new Date().toISOString(), display: false }, ...l])
-      setStored(`project:${nid}:details`, v)
-    } else {
-      setProjects((l) => l.map((p) => (p.id === id ? { ...p, ...row } : p)))
-      setStored(`project:${id}:details`, v)
+    if (!live) { say('The server can’t be reached right now: nothing was saved. Please try again.'); return }
+    const devId = devs.find((d) => d.name === v.developer)?.id
+    if (!devId) { say('Pick the developer from the list'); return }
+    const conId = cons.find((c) => c.name === v.consultant)?.id
+    const fields = {
+      Ref: v.ref, MaalemDubaiNo: v.maalemNumber, MaalemDubaiRef: v.maalemRef, ProjectName: v.name, DeveloperID: devId,
+      Engineer: v.engineer, AsstEng: v.assistantEngineer, MasterPlanStatus: v.masterPlanStatus, Corridors11kV: v.corridors, Ducts11kV: v.ducts,
+      HVNOC: v.hvNoc, SiteSurveyor: v.siteSurveyor, AreaMap: v.areaMap, AreaMapRef: v.areaMapRef, AreaReport: v.areaReport,
+      SS132kV: v.ss132, SS400kV: v.ss400, Zone: v.zone, SubZone: v.subZone, BuiltPerc: v.built, UCPerc: v.underConstruction, VPerc: v.vacant,
+      ProjectCategory: v.category,
     }
-    say('Project saved'); setTimeout(() => navigate('/projects'), 700)
+    setSaving(true)
+    try {
+      const ref = await saveRecord('project', isNew ? null : id, fields, user?.name)
+      let note = ''
+      if (conId && (isNew || v.consultant !== (project?.consultant ?? ''))) {
+        try { await saveRecord('projectConsultant', null, { MaalemDubaiRef: ref || v.maalemRef, ConsultantID: conId }, user?.name) }
+        catch (e) { note = ` (the consultant link was not saved: ${userMessage(e, 'please try again')})` }
+      }
+      await syncEntity('projects')
+      say(`Project saved${note}`)
+      setTimeout(() => navigate('/projects'), note ? 2500 : 700)
+    } catch (e) {
+      say(userMessage(e, 'Could not save the project'))
+    }
+    setSaving(false)
   }
-  const tabs = isNew ? ['Project details'] : ['Project details', 'Substation', 'Remarks', 'AI review', 'Discussion & decisions']
+  const tabs = isNew ? ['Project details'] : ['Project details', 'Substation', 'Remarks', 'Discussion & decisions']
 
   return (
     <div className="page">
       <PageHeader title={isNew ? 'New project' : (project?.name ?? 'Project')} subtitle={isNew ? 'Fields marked * are required' : `REF# ${project?.maalemRef ?? id} · ${editable ? 'Editing' : 'View only — click Enable to edit'}`}
-        badge={!isNew && <StatusChip status={editable ? 'inprogress' : 'active'} label={editable ? 'Editing' : 'Active'} />}
+        badge={!isNew && <><StatusChip status={editable ? 'inprogress' : 'active'} label={editable ? 'Editing' : 'Active'} />{fromDb && <RemoteBadge state={remote} />}</>}
         actions={<>
           {!isNew && <AppButton variant="outlined" startIcon={<FolderOpen size={16} />} onClick={() => navigate(`/projects/${id}/files/Area Map`)}>Files</AppButton>}
           {!isNew && <AppButton variant="outlined" startIcon={editable ? <Ban size={16} /> : <Power size={16} />} onClick={() => setEditable(!editable)}>{editable ? 'Disable' : 'Enable'}</AppButton>}
           <AppButton variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/projects')}>Back</AppButton>
-          {editable && <AppButton variant="contained" startIcon={<Save size={16} />} onClick={save}>Save</AppButton>}
+          {editable && <AppButton variant="contained" loading={saving} startIcon={<Save size={16} />} onClick={save}>Save</AppButton>}
         </>} />
 
       {!isNew && (
@@ -149,7 +186,7 @@ export default function ProjectFormPage() {
             </Section>
             {!isNew && (
               <Section title="Totals" index={5}>
-                <div className="grid-auto"><TextField label="Total plots no" value={String(plotCount)} readOnly /><TextField label="Total TCL (MW)" value={String(tcl)} readOnly /><TextField label="Total DCP (MW)" value={String(Math.round(tcl * 0.12))} readOnly /></div>
+                <div className="grid-auto"><TextField label="Total plots no" value={String(totals?.plots ?? plotCount)} readOnly /><TextField label="Total TCL (MW)" value={String(totals?.tcl ?? tcl)} readOnly /><TextField label="Total DCP (MW)" value={String(totals?.dcp ?? Math.round(tcl * 0.12))} readOnly /></div>
               </Section>
             )}
           </div>
@@ -196,13 +233,12 @@ export default function ProjectFormPage() {
           </div>
         )}
 
-        {tab === 'AI review' && <ProjectAiReview run={() => reviewProject(v, required, LABELS)} />}
         {tab === 'Discussion & decisions' && <ProjectDiscussion projectId={id} />}
       </div>
 
-      {picker === 'developer' && <LookupModal title="Select developer" items={devs.map((d) => d.name)} onPick={(x) => set('developer', x)} onClose={() => setPicker(null)} />}
-      {picker === 'consultant' && <LookupModal title="Select consultant" items={cons.map((d) => d.name)} onPick={(x) => set('consultant', x)} onClose={() => setPicker(null)} />}
-      {subModal && <SubstationModal all={allSubs} future={subModal === 'future'} onClose={() => setSubModal(null)} onSave={(r) => { (subModal === 'future' ? setFuture : setExisting)((p) => [...p, r]); setSubModal(null); say('Substation added') }} />}
+      {picker === 'developer' && <LookupModal title="Select developer" items={devs.filter((d) => d.showInSO).map((d) => d.name)} onPick={(x) => set('developer', x)} onClose={() => setPicker(null)} />}
+      {picker === 'consultant' && <LookupModal title="Select consultant" items={cons.filter((d) => d.showInSO).map((d) => d.name)} onPick={(x) => set('consultant', x)} onClose={() => setPicker(null)} />}
+      {subModal && <SubstationModal all={allSubs.filter((s) => s.showInSO)} future={subModal === 'future'} onClose={() => setSubModal(null)} onSave={(r) => { (subModal === 'future' ? setFuture : setExisting)((p) => [...p, r]); setSubModal(null); say('Substation added') }} />}
       {remarkModal && <RemarkModal onClose={() => setRemarkModal(false)} onSave={(r) => { setRemarks((p) => [...p, r]); setRemarkModal(false); say('Remark added') }} />}
       {toast}
     </div>

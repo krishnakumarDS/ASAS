@@ -70,7 +70,7 @@ export const useLimits = () => usePersistent<StandardLimit[]>('limits', standard
 export const useDevelopers = () => usePersistent<Party[]>('developers', developers)
 export const useConsultants = () => usePersistent<Party[]>('consultants', consultants)
 
-/** Non-hook snapshots (e.g. for the chat assistant). */
+/** Non-hook snapshots (for code outside React components, e.g. the header notifications). */
 export const snapshot = {
   projects: () => getStored<Project[]>('projects', projects),
   plots: () => getStored<Plot[]>('plots', plots),

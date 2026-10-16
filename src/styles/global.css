@@ -126,7 +126,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .cell-title { font-weight: 600; }
 .cell-sub { font-size: 12px; color: var(--text-secondary); }
 .table-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border-light); color: var(--text-secondary); font-size: 13px; flex-wrap: wrap; }
-.pager { display: flex; align-items: center; gap: 4px; }
+.pager { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
 .pager button { min-width: 32px; height: 32px; padding: 0 8px; border-radius: var(--radius-sm); font-weight: 600; font-size: 13px; color: var(--text-secondary); transition: all var(--transition-fast); display: inline-flex; align-items: center; justify-content: center; }
 .pager button:hover:not(:disabled):not(.on) { background: var(--bg-tertiary); color: var(--text-primary); }
 .pager button.on { background: var(--accent-600); color: #fff; }
@@ -211,10 +211,10 @@ button.party { text-align: left; display: block; width: 100%; cursor: pointer; }
 .report { display: block; border-top: 3px solid var(--tone); }
 .report-ico { width: 44px; height: 44px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--tone); background: color-mix(in srgb, var(--tone) 12%, transparent); flex-shrink: 0; }
 
-.ai-input { position: relative; display: flex; align-items: center; gap: 8px; }
-.ai-input .input { padding-left: 42px; min-height: 46px; font-size: 15px; border-radius: var(--radius-lg); }
-.ai-ico { position: absolute; left: 14px; color: var(--accent-600); pointer-events: none; }
-.ai-input .ghost-btn { position: absolute; right: 6px; }
+.search-input { position: relative; display: flex; align-items: center; gap: 8px; }
+.search-input .input { padding-left: 42px; min-height: 46px; font-size: 15px; border-radius: var(--radius-lg); }
+.search-ico { position: absolute; left: 14px; color: var(--accent-600); pointer-events: none; }
+.search-input .ghost-btn { position: absolute; right: 6px; }
 
 .pick { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-primary); cursor: pointer; transition: all var(--transition-base); }
 .pick:hover { border-color: var(--border-medium); background: var(--bg-secondary); }

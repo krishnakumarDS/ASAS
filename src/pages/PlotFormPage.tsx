@@ -1,11 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Save } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import Section from '../components/common/Section'
 import PageHeader from '../components/PageHeader'
+import RemoteBadge from '../components/RemoteBadge'
+import { loadPlot } from '../data/details'
+import { userMessage } from '../data/api'
+import { saveRecord } from '../data/write'
+import { useRemote } from '../data/remote'
+import { syncEntity, useSyncStatus } from '../data/sync'
 import { LookupModal, PickField, RadioField, TextField, useToast } from '../components/ui'
-import { newId, setStored, useConsultants, usePersistent, usePlots, useProjects, useSubstations } from '../data/store'
+import { useConsultants, usePersistent, usePlots, useProjects, useSubstations } from '../data/store'
 
 type V = Record<string, string>
 const loads = ['dataCenter', 'solar', 'industrial', 'lighting', 'evCharger', 'agritech', 'other']
@@ -15,7 +21,7 @@ export default function PlotFormPage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const navigate = useNavigate()
-  const [plots, setPlots] = usePlots()
+  const [plots] = usePlots()
   const [projects] = useProjects()
   const [consultants] = useConsultants()
   const [substations] = useSubstations()
@@ -29,27 +35,49 @@ export default function PlotFormPage() {
     powerDensity: '', gfa: '', landUse: '', expPower: '', generalLoad: '', cooling: '', dcp: '', tcl: '', initDate: '', ultDate: '',
     ...Object.fromEntries(loads.map((l) => [l, ''])),
   })
+  // Opening a plot calls the flow for its full record and its initial/ultimate substations.
+  const live = useSyncStatus().state === 'live' // ids are only database ids once the lists came from SQL
+  const remote = useRemote(plot && live ? plot.id : null, () => loadPlot(plot!.id))
+  useEffect(() => { if (remote.data) setV((p) => ({ ...p, ...remote.data })) }, [remote.data])
   const [lookup, setLookup] = useState<null | 'consultant' | 'initSub' | 'ultSub'>(null)
   const [submitted, setSubmitted] = useState(false)
   const [toast, say] = useToast()
   const set = (k: string) => (x: string) => setV((p) => ({ ...p, [k]: x }))
   const t = (k: string, label: string, o: { required?: boolean; type?: string; readOnly?: boolean } = {}) =>
     <TextField label={label} value={v[k]} onChange={set(k)} type={o.type} readOnly={o.readOnly} required={o.required} error={submitted && o.required && !v[k] ? 'This field is required' : undefined} />
-  const save = () => {
+  const [saving, setSaving] = useState(false)
+  // Save writes to SQL through the flow (plot.create / plot.update), then reloads the lists.
+  const save = async () => {
     setSubmitted(true)
     if (!v.show || !v.devPlot) return
-    const row = { maalemRef: v.maalemRef, projectName: v.projectName, devPlot: v.devPlot, dmPlot: v.dmPlot, developer: v.developer, consultant: v.consultant, display: v.show === 'Yes' }
-    if (plot) { setPlots((l) => l.map((p) => (p.id === plot.id ? { ...p, ...row } : p))); setStored(`plot:${plot.id}:details`, v) }
-    else { const nid = newId(); setPlots((l) => [{ id: nid, ...row }, ...l]); setStored(`plot:${nid}:details`, v) }
-    say('Plot saved'); setTimeout(() => navigate('/plots'), 700)
+    if (!live) { say('The server can’t be reached right now: nothing was saved. Please try again.'); return }
+    if (!v.maalemRef) { say('Choose the project first'); return }
+    const subId = (name: string) => substations.find((s) => s.name === name)?.id
+    const fields = {
+      MaalemDubaiRef: v.maalemRef, ConsultantID: consultants.find((c) => c.name === v.consultant)?.id, DevPlotNum: v.devPlot, DMPlotNum: v.dmPlot,
+      PlotOwnerName: v.owner, PlotProjectName: v.projectName, PlotStatus: v.status, NOCRelease: v.noc, IsActive: v.show === 'Yes',
+      InitSubID: subId(v.initSub), UltSubID: subId(v.ultSub), InitDevSubCommDate: v.initDate, UltDevSubCommDate: v.ultDate,
+      PowerDensity: v.powerDensity, GFA: v.gfa, LandUse: v.landUse, ExpPowerReq: v.expPower, GenaralLoad: v.generalLoad, LocalizedCoolingLoad: v.cooling,
+      DCP: v.dcp, TotalConnectedLoad: v.tcl, DataCenterLoad: v.dataCenter, SolarLoad: v.solar, IndustrialLoad: v.industrial, LightingLoad: v.lighting,
+      EVChargerLoad: v.evCharger, AgritechLoad: v.agritech, OtherLoads: v.other,
+    }
+    setSaving(true)
+    try {
+      await saveRecord('plot', plot ? plot.id : null, fields)
+      await syncEntity('plots')
+      say('Plot saved'); setTimeout(() => navigate('/plots'), 700)
+    } catch (e) {
+      say(userMessage(e, 'Could not save the plot'))
+    }
+    setSaving(false)
   }
 
   return (
     <div className="page">
-      <PageHeader title={plot ? `Plot ${plot.devPlot}` : 'New plot'} subtitle={project ? `${project.maalemRef} · ${project.name}` : 'Fields marked * are required'} actions={
+      <PageHeader title={plot ? `Plot ${plot.devPlot}` : 'New plot'} subtitle={project ? `${project.maalemRef} · ${project.name}` : 'Fields marked * are required'} badge={plot && <RemoteBadge state={remote} />} actions={
         <>
           <AppButton variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate('/plots')}>Back</AppButton>
-          <AppButton variant="contained" startIcon={<Save size={16} />} onClick={save}>Save</AppButton>
+          <AppButton variant="contained" loading={saving} startIcon={<Save size={16} />} onClick={save}>Save</AppButton>
         </>
       } />
       <div className="stack">
@@ -76,8 +104,8 @@ export default function PlotFormPage() {
           </div>
         </Section>
       </div>
-      {lookup === 'consultant' && <LookupModal title="Select consultant" items={consultants.map((c) => c.name)} onPick={set('consultant')} onClose={() => setLookup(null)} />}
-      {(lookup === 'initSub' || lookup === 'ultSub') && <LookupModal title="Select substation" items={substations.map((s) => s.name)} onPick={set(lookup)} onClose={() => setLookup(null)} />}
+      {lookup === 'consultant' && <LookupModal title="Select consultant" items={consultants.filter((c) => c.showInSO).map((c) => c.name)} onPick={set('consultant')} onClose={() => setLookup(null)} />}
+      {(lookup === 'initSub' || lookup === 'ultSub') && <LookupModal title="Select substation" items={substations.filter((s) => s.showInSO).map((s) => s.name)} onPick={set(lookup)} onClose={() => setLookup(null)} />}
       {toast}
     </div>
   )

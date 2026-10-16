@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Database, FileSpreadsheet, FileText, Globe2, Layers, RefreshCw, Satellite, Workflow } from 'lucide-react'
+import { Database, FileText, Globe2, Layers, RefreshCw, Satellite, Workflow } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import PageHeader from '../components/PageHeader'
@@ -11,7 +11,6 @@ const SYSTEMS: Sys[] = [
   { key: 'tms', name: 'TMS', desc: 'Transaction and submission tracking.', icon: Workflow, status: 'connected' },
   { key: 'sap', name: 'SAP', desc: 'Project, vendor and cost records.', icon: Database, status: 'connected' },
   { key: 'rekaaz', name: 'ReKaaz', desc: 'Document and records repository.', icon: Layers, status: 'connected' },
-  { key: 'sheets', name: 'Spreadsheets', desc: 'Multi-sheet Excel loads via AI upload.', icon: FileSpreadsheet, status: 'connected' },
   { key: 'reports', name: 'Reports', desc: 'Report and presentation generation.', icon: FileText, status: 'connected' },
 ]
 

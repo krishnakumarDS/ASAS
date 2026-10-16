@@ -1,7 +1,7 @@
-import { BarChart3, Building2, Handshake, HardHat, LayoutDashboard, LineChart, MapPinned, Network, Plug, Sparkles, Zap } from 'lucide-react'
+import { BarChart3, Building2, Handshake, HardHat, LayoutDashboard, LineChart, MapPinned, Network, Plug, TestTube, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export interface NavItem { id: string; label: string; icon: LucideIcon; path?: string; action?: 'chat' }
+export interface NavItem { id: string; label: string; icon: LucideIcon; path: string }
 export interface NavGroup { id: string; label: string; items: NavItem[] }
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -22,6 +22,6 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: 'reports', label: 'Reports & decks', icon: BarChart3, path: '/reports' },
     { id: 'trends', label: 'Trends & forecast', icon: LineChart, path: '/trends' },
     { id: 'integrations', label: 'Integrations', icon: Plug, path: '/integrations' },
-    { id: 'ai', label: 'AI assistant', icon: Sparkles, action: 'chat' },
+    ...(import.meta.env.DEV ? [{ id: 'flow-test', label: 'Flow test', icon: TestTube, path: '/flow-test' }] : []), // developer tool, not shipped to users
   ] },
 ]
