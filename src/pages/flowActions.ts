@@ -226,7 +226,7 @@ export const CRUD_ENTITIES: Record<string, { id: string | number; create: object
   substationLimit: { id: 1, create: { substationID: 1, limitID: 1 }, update: { limitID: 2 } },
 }
 export const CRUD_ENTITY_NAMES = Object.keys(CRUD_ENTITIES)
-export const CRUD_OPS = ['list', 'get', 'create', 'update', 'setActive', 'delete', 'createMany', 'setActiveMany', 'deleteMany'] as const
+export const CRUD_OPS = ['list', 'get', 'create', 'update', 'setActive', 'delete', 'createMany', 'setActiveMany', 'deleteMany', 'columns'] as const
 export const crudSample = (entity: string, op: string): string => {
   const e = CRUD_ENTITIES[entity]
   if (!e) return '{}'
@@ -241,6 +241,7 @@ export const crudSample = (entity: string, op: string): string => {
     createMany: { rows: [e.create, e.create], user },
     setActiveMany: { ids: [e.id], isActive: false, user },
     deleteMany: { ids: [e.id], user },
+    columns: {},
   }
   return JSON.stringify(body[op] ?? {}, null, 2)
 }

@@ -1,28 +1,33 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, ClipboardList, FileImage, FileText, History, Layers, Map as MapIcon, Plus, Presentation, RefreshCw, Search, Upload } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ClipboardList, Download, FileImage, FileText, History, Layers, Map as MapIcon, Plus, Presentation, RefreshCw, Search, Upload } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import EmptyState from '../components/common/EmptyState'
 import StatusChip from '../components/common/StatusChip'
 import PageHeader from '../components/PageHeader'
+import IconButton from '../components/common/IconButton'
 import { ActionsMenu, DataTable, FileDrop, Modal, SelectField, TextField, useToast } from '../components/ui'
 import { fmtDate } from '../data/mock'
-import { newId, usePersistent, useProjects, useSubstations } from '../data/store'
+import { uploadFile } from '../data/files'
+import { downloadUrl, filesIn, setTabActive, splitTab, syncFiles, useFilesStatus, useSpFiles } from '../data/spFiles'
+import type { SpFile } from '../data/spFiles'
+import { errorDetail, userMessage } from '../data/api'
+import { getStored, newId, usePersistent, useProjects, useSubstations } from '../data/store'
 import { useAuth } from '../context/AuthContext'
 
 const TABS: { name: string; icon: LucideIcon }[] = [
   { name: 'Area Map', icon: MapIcon }, { name: 'Area Report', icon: FileText }, { name: 'Presentation', icon: Presentation }, { name: 'Zoning', icon: Layers },
   { name: 'Project Layout', icon: FileImage }, { name: 'Issues', icon: AlertCircle }, { name: 'History', icon: History }, { name: 'PPR', icon: ClipboardList },
 ]
-const NO_ACTIVE: Record<string, string> = {}
-const NO_INACTIVE: Record<string, FileRow[]> = {}
 const NO_PPR: PprRow[] = []
 const NO_ISSUES: IssueRow[] = []
 const NO_HISTORY: HistoryRow[] = []
+/** Downloads the file: its SharePoint address with ?download=1 opens in a new tab and the browser saves it. */
+const download = (f: SpFile) => { const u = downloadUrl(f); if (u) window.open(u, '_blank', 'noopener') }
+const isFileTabName = (t: string) => !['Issues', 'History', 'PPR'].includes(t)
 const ACCEPT_HINT = 'Accepted: DOC, DOCX, XLSX, XLS, JPG, PNG, JPEG and PDF.'
 
-interface FileRow { id: string; name: string; uploadedAt: string; uploadedBy: string; active: boolean }
 interface IssueRow { id: string; description: string; fileName: string; createdBy: string; createdOn: string; active: boolean }
 interface HistoryRow { id: string; date: string; ptpReceived: string; mpRef: string; createdBy: string; createdOn: string; active: boolean; reply: string }
 interface PprRow { id: string; substation: string; createdBy: string; createdOn: string; updatedBy: string; updatedOn: string; active: boolean; fileName: string }
@@ -49,11 +54,21 @@ export default function ProjectFilesPage() {
   const [modal, setModal] = useState(false)
   const [q, setQ] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const seededFiles = /^\d+$/.test(id)
-  const slug = (project?.name ?? 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-')
-  const seedActive = useMemo<Record<string, string>>(() => (seededFiles ? { 'Project Layout': `${slug}-layout.pdf`, 'Area Map': `${slug}-area-map.jpg` } : NO_ACTIVE), [id])
-  const [activeFiles, setActiveFiles] = usePersistent<Record<string, string>>(`project:${id}:active`, seedActive)
-  const [inactive, setInactive] = usePersistent<Record<string, FileRow[]>>(`project:${id}:inactive`, NO_INACTIVE)
+  const sp = useSpFiles()
+  const spStatus = useFilesStatus()
+  // The files of a tab come from SharePoint (<project ref>/<tab>): the newest is the active one, older ones are in-active.
+  const tabFiles = useMemo(() => filesIn(sp.items, project?.maalemRef ?? id, tab), [sp.items, project?.maalemRef, id, tab])
+  const { active: activeFile, inactive: inactiveFiles } = useMemo(() => splitTab(tabFiles), [tabFiles])
+  const [switching, setSwitching] = useState(false)
+  // Active / in-active is the Status column of the file in SharePoint (ASAS_File_Activations flow). One active file per tab: making one active makes the others in-active.
+  const activate = async (target: SpFile | null) => {
+    setSwitching(true)
+    try { await setTabActive(project?.maalemRef ?? id, tab, target); say(target ? 'File is now active' : 'File set to in-active') }
+    catch (e) { console.error(e); say(`The file status could not be changed: ${errorDetail(e)}`) }
+    setSwitching(false)
+  }
   const [issues, setIssues] = usePersistent<IssueRow[]>(`project:${id}:issues`, NO_ISSUES)
   const [history, setHistory] = usePersistent<HistoryRow[]>(`project:${id}:history`, NO_HISTORY)
   const seedPpr = useMemo<PprRow[]>(() => { const sub = seededFiles ? substations[(Number(id) * 2) % Math.max(1, substations.length)] : undefined; return sub ? [{ id: `p${id}`, substation: sub.name, createdBy: sub.createdBy, createdOn: sub.createdOn, updatedBy: sub.createdBy, updatedOn: sub.createdOn, active: true, fileName: `${sub.scada.toLowerCase()}-ppr.pdf` }] : NO_PPR }, [id])
@@ -67,15 +82,20 @@ export default function ProjectFilesPage() {
   const close = () => { setModal(false); setFile(null); setDesc(''); setHDate(''); setPtp(''); setMp(''); setSubstation('') }
   const now = () => new Date().toISOString()
   const uid = newId
-  const submit = () => {
+  const submit = async () => {
+    // the file goes to SharePoint first (folder = "<project ref.>/<tab>", e.g. MP-00000-114/Area Map; the file keeps its own name); the lists are only updated once it is stored
+    if (file) {
+      setUploading(true)
+      try { await uploadFile(`${project?.maalemRef ?? id}/${tab}`, file) }
+      catch (e) { say(userMessage(e, 'The file could not be uploaded. Please try again.')); setUploading(false); return }
+      await syncFiles() // the new file is read back from SharePoint
+      const newest = filesIn(getStored<{ items: SpFile[] }>('spFiles', { items: [] }).items, project?.maalemRef ?? id, tab)[0]
+      if (newest && isFileTabName(tab)) { try { await setTabActive(project?.maalemRef ?? id, tab, newest) } catch (e) { say(`The file was uploaded, but it could not be made active: ${errorDetail(e)}`) } }
+      setUploading(false)
+    }
     if (tab === 'Issues') setIssues((p) => [...p, { id: uid(), description: desc, fileName: file?.name ?? '', createdBy: ME, createdOn: now(), active: true }])
     else if (tab === 'History') setHistory((p) => [...p, { id: uid(), date: hDate, ptpReceived: ptp, mpRef: mp, createdBy: ME, createdOn: now(), active: true, reply: file?.name ?? '' }])
     else if (tab === 'PPR') setPpr((p) => [...p, { id: uid(), substation, createdBy: ME, createdOn: now(), updatedBy: ME, updatedOn: now(), active: true, fileName: file?.name ?? '' }])
-    else if (file) {
-      const prev = activeFiles[tab]
-      if (prev) setInactive((m) => ({ ...m, [tab]: [...(m[tab] ?? []), { id: uid(), name: prev, uploadedAt: now(), uploadedBy: ME, active: false }] }))
-      setActiveFiles((m) => ({ ...m, [tab]: file.name }))
-    }
     say('Uploaded successfully'); close()
   }
   const canSubmit = tab === 'Issues' ? !!desc.trim() : tab === 'History' ? !!hDate : tab === 'PPR' ? !!substation : !!file
@@ -100,22 +120,31 @@ export default function ProjectFilesPage() {
                 <div className="row between wrap" style={{ gap: 12, marginBottom: 14 }}>
                   <div><h4>{tab}</h4><p className="muted" style={{ fontSize: 13 }}>Active file in Smart Office</p></div>
                   <div className="row wrap">
-                    <AppButton variant="outlined" startIcon={<RefreshCw size={15} />} onClick={() => say('Refreshed')}>Refresh</AppButton>
+                    <AppButton variant="outlined" startIcon={<RefreshCw size={15} />} loading={spStatus === 'loading'} onClick={() => { void syncFiles().then((ok) => say(ok ? 'Refreshed' : 'The file list could not be loaded. Please try again.')) }}>Refresh</AppButton>
                     <AppButton variant="contained" startIcon={<Upload size={15} />} onClick={() => setModal(true)}>Upload new file</AppButton>
                   </div>
                 </div>
-                {activeFiles[tab] ? <div className="row" style={{ gap: 12, padding: '14px 16px', background: 'var(--accent-50)', border: '1px solid var(--accent-100)', borderRadius: 'var(--radius-md)', color: 'var(--accent-600)', fontWeight: 600 }}><FileText size={18} />{activeFiles[tab]}<span className="badge badge-success" style={{ marginLeft: 'auto' }}>Active</span></div> : <EmptyState compact title="No active file" description="Upload a file to make it active." />}
+                {activeFile ? (
+                  <div className="row" style={{ gap: 12, padding: '14px 16px', background: 'var(--accent-50)', border: '1px solid var(--accent-100)', borderRadius: 'var(--radius-md)', color: 'var(--accent-600)', fontWeight: 600 }}>
+                    <FileText size={18} /><a href={activeFile.link} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{activeFile.name}</a>
+                    <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>{activeFile.by} · {fmtDate(activeFile.modified)}</span>
+                    <span className="badge badge-success" style={{ marginLeft: 'auto' }}>Active</span>
+                    <IconButton small title="Download" aria-label={`Download ${activeFile.name}`} onClick={() => download(activeFile)}><Download size={17} /></IconButton>
+                    <AppButton variant="outlined" size="small" loading={switching} onClick={() => { void activate(null) }}>Make in-active</AppButton>
+                  </div>
+                ) : spStatus === 'loading' && !sp.at ? <p className="row" style={{ gap: 8 }}><span className="spinner" /> Loading files…</p>
+                  : <EmptyState compact title="No active file" description="Upload a file, or make one of the in-active files active." />}
               </section>
               <section className="card">
                 <div className="card-head"><h4>In-active files</h4></div>
                 <SearchRow q={q} setQ={setQ} placeholder="Search by file name…" />
-                <DataTable<FileRow>
-                  rows={(inactive[tab] ?? []).filter((r) => match(r.name))} empty="No in-active files."
+                <DataTable<SpFile>
+                  rows={inactiveFiles.filter((r) => match(r.name))} empty="No in-active files."
                   columns={[
-                    { header: 'File name', render: (r) => <strong>{r.name}</strong> },
-                    { header: 'Uploaded', render: (r) => <><div>{r.uploadedBy}</div><div className="cell-sub">{fmtDate(r.uploadedAt)}</div></> },
+                    { header: 'File name', render: (r) => <a href={r.link} target="_blank" rel="noreferrer"><strong>{r.name}</strong></a> },
+                    { header: 'Uploaded', render: (r) => <><div>{r.by}</div><div className="cell-sub">{fmtDate(r.modified)}</div></> },
                     { header: 'Active', render: () => <StatusChip status="inactive" label="false" /> },
-                    { header: '', align: 'right', render: (r) => del('Delete', () => setInactive((m) => ({ ...m, [tab]: m[tab].filter((x) => x.id !== r.id) }))) },
+                    { header: '', align: 'right', render: (r) => <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}><IconButton small title="Download" aria-label={`Download ${r.name}`} onClick={() => download(r)}><Download size={17} /></IconButton><AppButton variant="outlined" size="small" disabled={switching} onClick={() => { void activate(r) }}>Make active</AppButton></div> },
                   ]}
                 />
               </section>
@@ -178,7 +207,7 @@ export default function ProjectFilesPage() {
       </div>
 
       {modal && (
-        <Modal title={modalTitle} size="sm" onClose={close} footer={<><AppButton variant="outlined" onClick={close}>Cancel</AppButton><AppButton variant="contained" disabled={!canSubmit} startIcon={<Upload size={15} />} onClick={submit}>Upload</AppButton></>}>
+        <Modal title={modalTitle} size="sm" onClose={close} footer={<><AppButton variant="outlined" disabled={uploading} onClick={close}>Cancel</AppButton><AppButton variant="contained" disabled={!canSubmit} loading={uploading} startIcon={<Upload size={15} />} onClick={() => { void submit() }}>Upload</AppButton></>}>
           {tab === 'Issues' && <TextField label="Issue description" multiline value={desc} onChange={setDesc} />}
           {tab === 'History' && <><TextField label="History date" type="date" required value={hDate} onChange={setHDate} /><TextField label="PTP letter received" value={ptp} onChange={setPtp} /><TextField label="MP letter ref" value={mp} onChange={setMp} /></>}
           {tab === 'PPR' && <SelectField label="Substation" required value={substation} options={substations.map((s) => s.name)} onChange={setSubstation} />}

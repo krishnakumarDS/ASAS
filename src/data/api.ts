@@ -15,7 +15,20 @@ export const useApiBusy = () => useSyncExternalStore((cb) => { busyListeners.add
 export function userMessage(e: unknown, fallback = 'Something went wrong. Please try again.'): string {
   const raw = e instanceof Error ? e.message : String(e ?? '')
   console.error(raw)
+  if (/NoResponse|BadGateway|\b502\b/.test(raw)) return 'The server did not answer: the database may have refused the request (see the flow run history for the reason). Nothing was saved.'
   return !raw || /BadGateway|\b502\b|NoResponse|flow|connection reference|Microsoft SQL|Invalid (object|column)|ALTERd|sp_UC|time[d ]?out|Failed to fetch|ResultSets|upstream|input|database|SQL/i.test(raw) ? fallback : raw
+}
+
+/** The reason inside an error, for screens that should show it: a JSON error body ({ error: { message, innerError: { error: { message } } } }) is reduced to its innermost message; long text is cut. */
+export function errorDetail(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e ?? '')
+  let msg = raw
+  try {
+    const j = JSON.parse(raw) as { error?: { message?: string; code?: unknown; innerError?: { error?: { message?: string; code?: string } } } }
+    const inner = j.error?.innerError?.error
+    msg = [j.error?.code, inner?.code, inner?.message ?? j.error?.message].filter(Boolean).join(' · ') || raw
+  } catch { /* not JSON: keep the text */ }
+  return msg.length > 260 ? `${msg.slice(0, 260)}…` : msg
 }
 
 /** Runs one dispatcher action. Resolves with the result sets in order (Table1, Table2, …); rejects if the flow or the procedure fails. */
@@ -39,13 +52,13 @@ async function callApiNow(action: string, params: Record<string, unknown>): Prom
 
 const PAGE = 500 // the dispatcher accepts at most 500 rows per page
 
-/** Reads every row of a Search* list: asks <search>_Count for the total, then fetches all pages in parallel. */
-export async function fetchAll(search: string, orderBy: string): Promise<Row[]> {
-  const counted = await callApi(`${search}_Count`)
+/** Reads every row of a Search* list (optionally filtered): asks <search>_Count for the total, then fetches all pages in parallel. */
+export async function fetchAll(search: string, orderBy: string, filters: Record<string, unknown> = {}): Promise<Row[]> {
+  const counted = await callApi(`${search}_Count`, filters)
   const total = Number(counted[0]?.[0]?.TotalCount ?? 0)
   const pages = Math.max(1, Math.ceil(total / PAGE))
   const chunks = await Promise.all(
-    Array.from({ length: pages }, (_, i) => callApi(search, { pageSize: PAGE, pageNumber: i + 1, orderBy, sort: 'ASC' }).then((t) => t[0] ?? [])),
+    Array.from({ length: pages }, (_, i) => callApi(search, { ...filters, pageSize: PAGE, pageNumber: i + 1, orderBy, sort: 'ASC' }).then((t) => t[0] ?? [])),
   )
   return chunks.flat()
 }

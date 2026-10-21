@@ -7,14 +7,15 @@ import StatusChip from '../components/common/StatusChip'
 import PageHeader from '../components/PageHeader'
 import ProjectDiscussion from '../components/ProjectDiscussion'
 import RemoteBadge from '../components/RemoteBadge'
-import { loadProject } from '../data/details'
+import { SubstationEntryModal } from '../components/SubstationPicker'
+import type { SubstationEntry } from '../components/SubstationPicker'
+import { loadProject, loadProjectRemarks, loadProjectSubstations } from '../data/details'
 import { userMessage } from '../data/api'
-import { saveRecord } from '../data/write'
+import { deleteRecord, saveRecord } from '../data/write'
 import { useRemote } from '../data/remote'
 import { syncEntity, useSyncStatus } from '../data/sync'
 import { ActionsMenu, DataTable, LookupModal, Modal, PickField, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
 import { fmtDate } from '../data/mock'
-import type { Substation } from '../data/mock'
 import { newId, setStored, useConsultants, useDevelopers, usePersistent, usePlots, useProjects, useSubstations } from '../data/store'
 import { useAuth } from '../context/AuthContext'
 import type { Project } from '../data/projects'
@@ -49,7 +50,7 @@ const NO_SUBS: SubRow[] = []
 const NO_REMARKS: Remark[] = []
 
 type Picker = null | 'developer' | 'consultant'
-interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string }
+interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string; substationId?: string }
 interface Remark { id: string; text: string; createdBy: string; createdOn: string; active: boolean }
 
 export default function ProjectFormPage() {
@@ -77,8 +78,10 @@ export default function ProjectFormPage() {
   const [existing, setExisting] = usePersistent<SubRow[]>(`project:${id}:existing`, seedExisting)
   const [future, setFuture] = usePersistent<SubRow[]>(`project:${id}:future`, NO_SUBS)
   const [subModal, setSubModal] = useState<null | 'existing' | 'future'>(null)
+  const [subSaving, setSubSaving] = useState(false)
   const [remarks, setRemarks] = usePersistent<Remark[]>(`project:${id}:remarks`, NO_REMARKS)
-  const [remarkModal, setRemarkModal] = useState(false)
+  const [remarkModal, setRemarkModal] = useState<null | 'new' | Remark>(null) // 'new' = add, a remark = edit it
+  const [remarkSaving, setRemarkSaving] = useState(false)
 
   // Opening a project calls the flow for its details, substations, remarks and totals.
   const remote = useRemote(fromDb ? id : null, () => loadProject(id))
@@ -86,11 +89,23 @@ export default function ProjectFormPage() {
     const d = remote.data
     if (!d) return
     setV((p) => ({ ...p, ...d.values }))
-    setStored(`project:${id}:existing`, d.existing)
-    setStored(`project:${id}:future`, d.future)
-    setStored(`project:${id}:remarks`, d.remarks)
   }, [remote.data, id])
   const totals = remote.data?.totals
+
+  // The Remarks tab reads the project's remarks (with their row ids) when it is opened, and again after every change.
+  const [remarksKey, setRemarksKey] = useState(0)
+  const remarksRemote = useRemote(fromDb && tab === 'Remarks' ? `${id}:${remarksKey}` : null, () => loadProjectRemarks(id))
+  useEffect(() => { if (remarksRemote.data) setStored(`project:${id}:remarks`, remarksRemote.data) }, [remarksRemote.data, id])
+
+  // The Substation tab reads the project's existing and future substations (with their row ids) when it is opened, and again after every change.
+  const [subsKey, setSubsKey] = useState(0)
+  const subsRemote = useRemote(fromDb && tab === 'Substation' ? `${id}:${subsKey}` : null, () => loadProjectSubstations(id))
+  useEffect(() => {
+    const d = subsRemote.data
+    if (!d) return
+    setStored(`project:${id}:existing`, d.existing)
+    setStored(`project:${id}:future`, d.future)
+  }, [subsRemote.data, id])
 
   const ro = !editable
   const plotCount = allPlots.filter((x) => x.maalemRef === v.maalemRef).length
@@ -103,6 +118,54 @@ export default function ProjectFormPage() {
 
   const live = useSyncStatus().state === 'live'
   const [saving, setSaving] = useState(false)
+
+  // Adding a substation: search popup, then the confirm form; Save writes to SQL (existingKVSS.create / projectFutureYear.create).
+  const addSubstation = async (e: SubstationEntry) => {
+    const kind = subModal
+    if (!kind) return
+    if (!fromDb) { // a sample project that is not in the database: keep it in this browser only
+      const r: SubRow = { id: newId(), name: e.substation.name, status: e.status, createdOn: new Date().toISOString(), createdBy: user?.name ?? 'Unknown', active: e.display === 'true', scada: e.substation.scada, substationId: e.substation.id, commissioning: e.year }
+      ;(kind === 'future' ? setFuture : setExisting)((p) => [...p, r]); setSubModal(null); say('Substation added'); return
+    }
+    if (!live) { say('The server can’t be reached right now: nothing was saved. Please try again.'); return }
+    setSubSaving(true)
+    try {
+      await saveRecord(kind === 'future' ? 'projectFutureYear' : 'existingKVSS', null, {
+        MaalemDubaiRef: id, SubstationID: Number(e.substation.id), Status: e.status, IsActive: e.display === 'true',
+        ...(kind === 'future' ? { ProjectYear: e.year, Remark: e.remark } : {}),
+      }, user?.name)
+      setSubsKey((k) => k + 1); setSubModal(null); say('Substation added')
+    } catch (err) { say(userMessage(err, 'Could not add the substation')) }
+    setSubSaving(false)
+  }
+  // Add / edit a remark: Save writes to UC000420_ProjectsRemarks (projectRemark.create / projectRemark.update).
+  const saveRemark = async (r: Remark) => {
+    const editing = remarkModal && remarkModal !== 'new' ? remarkModal : null
+    if (!fromDb) { // a sample project that is not in the database: keep it in this browser only
+      setRemarks((p) => (editing ? p.map((x) => (x.id === editing.id ? { ...x, text: r.text, active: r.active } : x)) : [...p, r])); setRemarkModal(null); say(editing ? 'Remark updated' : 'Remark added'); return
+    }
+    if (!live) { say('The server can’t be reached right now: nothing was saved. Please try again.'); return }
+    setRemarkSaving(true)
+    try {
+      await saveRecord('projectRemark', editing ? editing.id : null, { MaalemDubaiRef: id, Remarks: r.text, IsActive: r.active }, user?.name)
+      setRemarksKey((k) => k + 1); setRemarkModal(null); say(editing ? 'Remark updated' : 'Remark added')
+    } catch (err) { say(userMessage(err, 'Could not save the remark')) }
+    setRemarkSaving(false)
+  }
+  // "Delete" hides the remark (projectRemark.delete); it stays in the list as inactive.
+  const removeRemark = async (r: Remark) => {
+    if (!fromDb) { setRemarks((p) => p.filter((x) => x.id !== r.id)); say('Remark removed'); return }
+    if (!live) { say('The server can’t be reached right now: nothing was changed. Please try again.'); return }
+    try { await deleteRecord('projectRemark', r.id, user?.name); setRemarksKey((k) => k + 1); say('Remark removed') }
+    catch (err) { say(userMessage(err, 'Could not remove the remark')) }
+  }
+  // "Delete" hides the row (existingKVSS.delete / projectFutureYear.delete); it stays in the list as inactive.
+  const removeSubstation = async (kind: 'existing' | 'future', r: SubRow) => {
+    if (!fromDb) { (kind === 'future' ? setFuture : setExisting)((p) => p.filter((x) => x.id !== r.id)); say('Substation removed'); return }
+    if (!live) { say('The server can’t be reached right now: nothing was changed. Please try again.'); return }
+    try { await deleteRecord(kind === 'future' ? 'projectFutureYear' : 'existingKVSS', r.id, user?.name); setSubsKey((k) => k + 1); say('Substation removed') }
+    catch (err) { say(userMessage(err, 'Could not remove the substation')) }
+  }
   // Save writes to SQL through the flow (project.create / project.update), links the consultant, then reloads the lists.
   const save = async () => {
     const missing = new Set(required.filter((k) => !v[k].trim()))
@@ -196,7 +259,6 @@ export default function ProjectFormPage() {
           <div className="card-body stack">
             {(['existing', 'future'] as const).map((kind) => {
               const rows = kind === 'existing' ? existing : future
-              const setRows = kind === 'existing' ? setExisting : setFuture
               return (
                 <section key={kind} className="card" style={{ overflow: 'hidden' }}>
                   <div className="card-head"><h4>{kind === 'existing' ? 'Existing substations' : 'Future substations'}</h4><AppButton variant="contained" size="small" startIcon={<Plus size={15} />} onClick={() => setSubModal(kind)}>Add</AppButton></div>
@@ -209,7 +271,7 @@ export default function ProjectFormPage() {
                       { header: 'Created', render: (r) => <><div>{r.createdBy}</div><div className="cell-sub">{fmtDate(r.createdOn)}</div></> },
                       { header: 'Active', render: (r) => <StatusChip status={r.active ? 'active' : 'inactive'} label={String(r.active)} /> },
                       { header: 'SCADA', render: (r) => r.scada },
-                      { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Delete', danger: true, onClick: () => { setRows(rows.filter((x) => x.id !== r.id)); say('Substation removed') } }]} /> },
+                      { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Delete', danger: true, onClick: () => { void removeSubstation(kind, r) } }]} /> },
                     ]}
                   />
                 </section>
@@ -220,14 +282,14 @@ export default function ProjectFormPage() {
 
         {tab === 'Remarks' && (
           <div>
-            <div className="card-head"><h4>Remarks log</h4><AppButton variant="contained" size="small" startIcon={<Plus size={15} />} onClick={() => setRemarkModal(true)}>Add</AppButton></div>
+            <div className="card-head"><h4>Remarks log</h4><AppButton variant="contained" size="small" startIcon={<Plus size={15} />} onClick={() => setRemarkModal('new')}>Add</AppButton></div>
             <DataTable<Remark>
               rows={remarks} empty="No remarks yet."
               columns={[
                 { header: 'Remark', render: (r) => r.text },
                 { header: 'Created', render: (r) => <><div>{r.createdBy}</div><div className="cell-sub">{fmtDate(r.createdOn)}</div></> },
                 { header: 'Active', render: (r) => <StatusChip status={r.active ? 'active' : 'inactive'} label={String(r.active)} /> },
-                { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Delete', danger: true, onClick: () => setRemarks(remarks.filter((x) => x.id !== r.id)) }]} /> },
+                { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Edit', onClick: () => setRemarkModal(r) }, { label: 'Delete', danger: true, onClick: () => { void removeRemark(r) } }]} /> },
               ]}
             />
           </div>
@@ -238,40 +300,22 @@ export default function ProjectFormPage() {
 
       {picker === 'developer' && <LookupModal title="Select developer" items={devs.filter((d) => d.showInSO).map((d) => d.name)} onPick={(x) => set('developer', x)} onClose={() => setPicker(null)} />}
       {picker === 'consultant' && <LookupModal title="Select consultant" items={cons.filter((d) => d.showInSO).map((d) => d.name)} onPick={(x) => set('consultant', x)} onClose={() => setPicker(null)} />}
-      {subModal && <SubstationModal all={allSubs.filter((s) => s.showInSO)} future={subModal === 'future'} onClose={() => setSubModal(null)} onSave={(r) => { (subModal === 'future' ? setFuture : setExisting)((p) => [...p, r]); setSubModal(null); say('Substation added') }} />}
-      {remarkModal && <RemarkModal onClose={() => setRemarkModal(false)} onSave={(r) => { setRemarks((p) => [...p, r]); setRemarkModal(false); say('Remark added') }} />}
+      {subModal && <SubstationEntryModal future={subModal === 'future'} substations={allSubs.filter((s) => s.showInSO)} taken={new Set((subModal === 'future' ? future : existing).filter((r) => r.active).map((r) => r.substationId ?? ''))} saving={subSaving} onClose={() => setSubModal(null)} onSave={addSubstation} />}
+      {remarkModal && <RemarkModal initial={remarkModal === 'new' ? undefined : remarkModal} saving={remarkSaving} onClose={() => setRemarkModal(null)} onSave={saveRemark} />}
       {toast}
     </div>
   )
 }
 
-function SubstationModal({ all, future, onClose, onSave }: { all: Substation[]; future: boolean; onClose: () => void; onSave: (r: SubRow) => void }) {
+function RemarkModal({ initial, saving, onClose, onSave }: { initial?: Remark; saving?: boolean; onClose: () => void; onSave: (r: Remark) => void }) {
   const { user } = useAuth()
-  const [name, setName] = useState('')
-  const [commissioning, setCommissioning] = useState('')
-  const sub = all.find((s) => s.name === name)
-  return (
-    <Modal title={future ? 'Add future substation' : 'Add existing substation'} size="sm" onClose={onClose} footer={
-      <>
-        <AppButton variant="outlined" onClick={onClose}>Cancel</AppButton>
-        <AppButton variant="contained" disabled={!name} onClick={() => onSave({ id: newId(), name, status: sub?.builtBy ?? '', createdOn: new Date().toISOString(), createdBy: user?.name ?? 'Unknown', active: true, scada: sub?.scada ?? '', commissioning })}>Save</AppButton>
-      </>
-    }>
-      <SelectField label="Substation" required value={name} options={all.map((s) => s.name)} onChange={setName} />
-      {future && <TextField label="Commissioning date" type="date" value={commissioning} onChange={setCommissioning} />}
-    </Modal>
-  )
-}
-
-function RemarkModal({ onClose, onSave }: { onClose: () => void; onSave: (r: Remark) => void }) {
-  const { user } = useAuth()
-  const [text, setText] = useState('')
-  const [active, setActive] = useState('true')
+  const [text, setText] = useState(initial?.text ?? '')
+  const [active, setActive] = useState(initial ? String(initial.active) : 'true')
   return (
     <Modal title="Project remarks" size="sm" onClose={onClose} footer={
       <>
-        <AppButton variant="outlined" onClick={onClose}>Cancel</AppButton>
-        <AppButton variant="contained" disabled={!text.trim()} onClick={() => onSave({ id: newId(), text, createdBy: user?.name ?? 'Unknown', createdOn: new Date().toISOString(), active: active === 'true' })}>Save</AppButton>
+        <AppButton variant="outlined" disabled={saving} onClick={onClose}>Cancel</AppButton>
+        <AppButton variant="contained" loading={saving} disabled={!text.trim()} onClick={() => onSave({ id: initial?.id ?? newId(), text: text.trim(), createdBy: initial?.createdBy ?? user?.name ?? 'Unknown', createdOn: initial?.createdOn ?? new Date().toISOString(), active: active === 'true' })}>Save</AppButton>
       </>
     }>
       <TextField label="Remark log" required multiline value={text} onChange={setText} />

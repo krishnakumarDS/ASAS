@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, MoreVertical, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Columns3, MoreVertical, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
 import AppButton from '../common/AppButton'
 import EmptyState from '../common/EmptyState'
 import IconButton from '../common/IconButton'
@@ -144,21 +144,76 @@ export function Tabs({ tabs, active, onChange }: { tabs: string[]; active: strin
   )
 }
 
-export interface Column<T> { header: string; render: (row: T) => ReactNode; align?: 'right'; sort?: { active: boolean; asc: boolean; onToggle: () => void } }
+export interface Column<T> { header: string; render: (row: T) => ReactNode; align?: 'right'; sort?: { active: boolean; asc: boolean; onToggle: () => void; onSet?: (asc: boolean) => void } }
+/** The small ▾ in a column header: Sort Ascending / Sort Descending and a Columns list to show or hide columns. */
+function HeaderMenu({ sort, icon, all, hidden, toggleColumn }: { sort?: Column<never>['sort']; icon: ReactNode; all: string[]; hidden: Set<string>; toggleColumn: (h: string) => void }) {
+  const [pos, setPos] = useState<null | { left: number; top: number }>(null)
+  const [cols, setCols] = useState(false)
+  const btn = useRef<HTMLButtonElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
+  const open = pos !== null
+  const close = () => { setPos(null); setCols(false) }
+  useEffect(() => {
+    if (!open) return
+    const down = (e: MouseEvent) => { const t = e.target as Node; if (!btn.current?.contains(t) && !pop.current?.contains(t)) close() }
+    const move = (e: Event) => { if (!pop.current?.contains(e.target as Node)) close() }
+    document.addEventListener('mousedown', down)
+    window.addEventListener('scroll', move, true)
+    window.addEventListener('resize', close)
+    return () => { document.removeEventListener('mousedown', down); window.removeEventListener('scroll', move, true); window.removeEventListener('resize', close) }
+  }, [open])
+  const toggle = () => {
+    if (open) { close(); return }
+    const r = btn.current?.getBoundingClientRect()
+    if (r) setPos({ left: Math.max(8, Math.min(r.left, window.innerWidth - 230)), top: r.bottom + 4 })
+  }
+  const item = { display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: 14, textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--text-primary)' } as const
+  return (
+    <>
+      <button ref={btn} type="button" className="sort-btn" aria-label="Column options" aria-expanded={open} onClick={toggle}>{icon}</button>
+      {pos && createPortal(
+        <div ref={pop} className="menu-pop" role="menu" style={{ position: 'fixed', left: pos.left, top: pos.top, right: 'auto', zIndex: 2000, minWidth: 210 }}>
+          {sort && <>
+            <button role="menuitem" className="lookup-item" style={item} onClick={() => { sort.onSet?.(true); close() }}><ArrowUp size={15} />Sort Ascending</button>
+            <button role="menuitem" className="lookup-item" style={item} onClick={() => { sort.onSet?.(false); close() }}><ArrowDown size={15} />Sort Descending</button>
+            <div className="menu-sep" />
+          </>}
+          <button role="menuitem" className="lookup-item" style={{ ...item, justifyContent: 'space-between' }} aria-expanded={cols} onClick={() => setCols(!cols)}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Columns3 size={15} />Columns</span><ChevronRight size={15} style={{ transform: cols ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }} />
+          </button>
+          {cols && <div style={{ maxHeight: 260, overflow: 'auto', borderTop: '1px solid var(--border-light)', marginTop: 4, paddingTop: 4 }}>
+            {all.map((h) => (
+              <label key={h} style={{ ...item, cursor: 'pointer' }}>
+                <input type="checkbox" checked={!hidden.has(h)} disabled={!hidden.has(h) && all.length - hidden.size <= 1} onChange={() => toggleColumn(h)} />{h}
+              </label>
+            ))}
+          </div>}
+        </div>, document.body)}
+    </>
+  )
+}
+
 export function DataTable<T extends { id: string }>({ columns, rows, empty = 'No records found.' }: { columns: Column<T>[]; rows: T[]; empty?: string }) {
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const toggleColumn = (h: string) => setHidden((cur) => { const n = new Set(cur); if (n.has(h)) n.delete(h); else n.add(h); return n })
+  const named = columns.filter((c) => c.header).map((c) => c.header)
+  const shown = columns.filter((c) => !hidden.has(c.header))
   return (
     <div className="table-wrap">
       <table className="table">
         <thead>
           <tr>
-            {columns.map((c) => (
+            {shown.map((c) => (
               <th key={c.header} className={c.align} aria-sort={c.sort?.active ? (c.sort.asc ? 'ascending' : 'descending') : undefined}>
-                {c.sort ? <button className="sort-btn" onClick={c.sort.onToggle}>{c.header}{c.sort.active ? (c.sort.asc ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} style={{ opacity: 0.4 }} />}</button> : c.header}
+                {c.sort && <button className="sort-btn" onClick={c.sort.onToggle}>{c.header}</button>}
+                {!c.sort && c.header}
+                {c.header && <span style={{ marginLeft: 4 }}><HeaderMenu sort={c.sort} all={named} hidden={hidden} toggleColumn={toggleColumn}
+                  icon={c.sort?.active ? (c.sort.asc ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : c.sort ? <ArrowUpDown size={12} style={{ opacity: 0.4 }} /> : <ChevronDown size={12} style={{ opacity: 0.5 }} />} /></span>}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>{rows.map((r) => <tr key={r.id}>{columns.map((c) => <td key={c.header} className={c.align}>{c.render(r)}</td>)}</tr>)}</tbody>
+        <tbody>{rows.map((r) => <tr key={r.id}>{shown.map((c) => <td key={c.header} className={c.align}>{c.render(r)}</td>)}</tr>)}</tbody>
       </table>
       {rows.length === 0 && <EmptyState compact title={empty} />}
     </div>
@@ -205,12 +260,35 @@ export function useOutsideClose(onClose: () => void) {
 }
 
 export function ActionsMenu({ items }: { items: { label: string; onClick: () => void; danger?: boolean }[] }) {
-  const [open, setOpen] = useState(false)
-  const ref = useOutsideClose(() => setOpen(false))
+  const [pos, setPos] = useState<null | { right: number; top?: number; bottom?: number }>(null)
+  const btn = useRef<HTMLDivElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
+  const open = pos !== null
+  // The list is drawn on the page itself (not inside the table), so a table or card edge never cuts it off.
+  useEffect(() => {
+    if (!open) return
+    const close = () => setPos(null)
+    const down = (e: MouseEvent) => { const t = e.target as Node; if (!btn.current?.contains(t) && !pop.current?.contains(t)) close() }
+    document.addEventListener('mousedown', down)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => { document.removeEventListener('mousedown', down); window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close) }
+  }, [open])
+  const toggle = () => {
+    if (open) { setPos(null); return }
+    const r = btn.current?.getBoundingClientRect()
+    if (!r) return
+    const right = window.innerWidth - r.right
+    // open upwards when there is not enough room below
+    setPos(window.innerHeight - r.bottom < items.length * 40 + 24 ? { right, bottom: window.innerHeight - r.top + 6 } : { right, top: r.bottom + 6 })
+  }
   return (
-    <div className="menu" ref={ref}>
-      <IconButton small onClick={() => setOpen(!open)} aria-label="Actions" aria-expanded={open}><MoreVertical size={17} /></IconButton>
-      {open && <div className="menu-pop" role="menu">{items.map((i) => <button key={i.label} role="menuitem" className={i.danger ? 'danger' : ''} onClick={() => { setOpen(false); i.onClick() }}>{i.label}</button>)}</div>}
+    <div className="menu" ref={btn}>
+      <IconButton small onClick={toggle} aria-label="Actions" aria-expanded={open}><MoreVertical size={17} /></IconButton>
+      {pos && createPortal(
+        <div className="menu-pop" role="menu" ref={pop} style={{ position: 'fixed', right: pos.right, top: pos.top, bottom: pos.bottom, zIndex: 2000 }}>
+          {items.map((i) => <button key={i.label} role="menuitem" className={i.danger ? 'danger' : ''} onClick={() => { setPos(null); i.onClick() }}>{i.label}</button>)}
+        </div>, document.body)}
     </div>
   )
 }
@@ -249,7 +327,7 @@ export function useSort<T>(rows: T[], getters: Record<string, (r: T) => string |
       return asc ? c : -c
     })
   }, [rows, key, asc])
-  const sortFor = (k: string) => ({ active: key === k, asc, onToggle: () => { if (key === k) setAsc(!asc); else { setKey(k); setAsc(true) } } })
+  const sortFor = (k: string) => ({ active: key === k, asc, onToggle: () => { if (key === k) setAsc(!asc); else { setKey(k); setAsc(true) } }, onSet: (a: boolean) => { setKey(k); setAsc(a) } })
   return { sorted, sortFor }
 }
 

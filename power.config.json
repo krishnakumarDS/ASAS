@@ -29,6 +29,55 @@
           "shared_sql": "118b7515-fc98-492e-913c-642b16f71d69"
         }
       }
+    },
+    "e3e432fb-cc90-4bb6-a17d-01475cd4c156": {
+      "id": "/providers/microsoft.powerapps/apis/shared_sharepointonline",
+      "displayName": "SharePoint"
+    },
+    "854d5b02-8696-4a9a-aef1-0de8fae24a20": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "asas_file_storage"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "56837aea-56cc-f111-a05c-0022480d5aed",
+        "workflowDisplayName": "Asas_file_Storage",
+        "workflowName": "3c431355-629f-5c48-e580-01d2a899f3ab",
+        "dependencies": {
+          "shared_sharepointonline": "e3e432fb-cc90-4bb6-a17d-01475cd4c156"
+        }
+      }
+    },
+    "8faee536-b2a5-461a-bfb5-a3a554112743": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "asas_getfiles"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "00022a3b-f25c-335c-d33a-2b2476a46557",
+        "workflowDisplayName": "ASAS_GetFiles",
+        "workflowName": "39d44e05-18db-c341-794d-f9c5767eb5a5",
+        "dependencies": {
+          "shared_sharepointonline": "e3e432fb-cc90-4bb6-a17d-01475cd4c156"
+        }
+      }
+    },
+    "aff38642-e3ae-4c1d-b7de-2e724e927a41": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "asas_file_activations"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "65413425-f6c7-04d3-9d50-c1d9faf6480d",
+        "workflowDisplayName": "ASAS_File_Activations",
+        "workflowName": "5790cefc-98cb-b4aa-994f-2638287ddeb5",
+        "dependencies": {
+          "shared_sharepointonline": "e3e432fb-cc90-4bb6-a17d-01475cd4c156"
+        }
+      }
     }
   },
   "databaseReferences": {},

@@ -1,7 +1,7 @@
-import { BarChart3, Building2, Handshake, HardHat, LayoutDashboard, LineChart, MapPinned, Network, Plug, TestTube, Zap } from 'lucide-react'
+import { BarChart3, Building2, Handshake, HardHat, LayoutDashboard, LineChart, MapPinned, Network, TestTube, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export interface NavItem { id: string; label: string; icon: LucideIcon; path: string }
+export interface NavItem { id: string; label: string; icon: LucideIcon; path: string; flowTestOnly?: boolean }
 export interface NavGroup { id: string; label: string; items: NavItem[] }
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -21,7 +21,6 @@ export const NAV_GROUPS: NavGroup[] = [
   { id: 'insights', label: 'Insights', items: [
     { id: 'reports', label: 'Reports & decks', icon: BarChart3, path: '/reports' },
     { id: 'trends', label: 'Trends & forecast', icon: LineChart, path: '/trends' },
-    { id: 'integrations', label: 'Integrations', icon: Plug, path: '/integrations' },
-    ...(import.meta.env.DEV ? [{ id: 'flow-test', label: 'Flow test', icon: TestTube, path: '/flow-test' }] : []), // developer tool, not shipped to users
+    { id: 'flow-test', label: 'Flow test', icon: TestTube, path: '/flow-test', flowTestOnly: true }, // developer tool: shown only to the user in constants/access.ts
   ] },
 ]

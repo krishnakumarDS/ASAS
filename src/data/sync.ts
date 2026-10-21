@@ -10,6 +10,7 @@ import { fetchAll } from './api'
 import type { Row } from './api'
 import type { Party, Plot, Substation } from './mock'
 import type { Project } from './projects'
+import { fixName } from './names'
 import { getStored, setStored } from './store'
 
 export type SyncState = 'idle' | 'loading' | 'live' | 'offline'
@@ -23,16 +24,18 @@ let settled = false // true once the first load has finished (loaded or failed)
 export const useDataReady = () => useSyncExternalStore((cb) => { listeners.add(cb); return () => { listeners.delete(cb) } }, () => settled)
 export const useSyncStatus = () => useSyncExternalStore((cb) => { listeners.add(cb); return () => { listeners.delete(cb) } }, () => status)
 
-const str = (v: unknown) => (v == null ? '' : String(v))
+export const str = (v: unknown) => (v == null ? '' : String(v))
 /** IsActive as SQL returns it: true / 1 / "True" / "1" mean active; a missing value is treated as active (only an explicit false / 0 hides a record). */
-const active = (v: unknown) => (v == null || v === '' ? true : v === true || v === 1 || /^(true|1|yes|y)$/i.test(String(v)))
+export const active = (v: unknown) => (v == null || v === '' ? true : v === true || v === 1 || /^(true|1|yes|y)$/i.test(String(v)))
 
 const toParty = (r: Row, idKey: string, nameKey: string, urlKey: string): Party => ({
-  id: str(r[idKey]), name: str(r[nameKey]), url: str(r[urlKey]), showInSO: active(r.IsActive), createdBy: str(r.created_by), createdOn: str(r.created_at),
+  id: str(r[idKey]), name: fixName(str(r[nameKey])), url: str(r[urlKey]), showInSO: active(r.IsActive), createdBy: str(r.created_by), createdOn: str(r.created_at),
 })
-const toPlot = (r: Row): Plot => ({
+/** Every substation name the plot row carries (any column like "...Sub...Name"), joined, so the search box can look in it. */
+const subText = (r: Row) => Object.entries(r).filter(([k, v]) => /sub/i.test(k) && /name/i.test(k) && v != null && v !== '').map(([, v]) => String(v)).join(' | ')
+export const toPlot = (r: Row): Plot => ({
   id: str(r.RowID), maalemRef: str(r.MaalemDubaiRef), projectName: str(r.ProjectName), devPlot: str(r.DevPlotNum), dmPlot: str(r.DMPlotNum),
-  developer: str(r.DeveloperName), consultant: str(r.ConsultantName), display: active(r.IsActive), createdOn: str(r.created_at),
+  developer: fixName(str(r.DeveloperName)), consultant: fixName(str(r.ConsultantName)), display: active(r.IsActive), createdOn: str(r.created_at), subs: subText(r),
 })
 const toSubstation = (r: Row): Substation => ({
   id: str(r.SubstationID), name: str(r.SubstationName), scada: str(r.SubstationSCADAName), builtBy: /dewa/i.test(str(r.BuiltBy)) ? 'DEWA' : 'Developer',
@@ -54,7 +57,7 @@ const JOBS: { key: Entity; search: string; orderBy: string; load: (rows: Row[]) 
   { key: 'projects', search: 'SearchProjects', orderBy: 'MPT.MaalemDubaiRef', load: (rows) => {
     const byRef = consultantByProject()
     const projects: Project[] = rows.filter((r) => r.MaalemDubaiRef != null).map((r) => ({
-      id: str(r.MaalemDubaiRef), maalemRef: str(r.MaalemDubaiRef), name: str(r.ProjectName), developer: str(r.DeveloperName),
+      id: str(r.MaalemDubaiRef), maalemRef: str(r.MaalemDubaiRef), name: str(r.ProjectName), developer: fixName(str(r.DeveloperName)),
       createdBy: str(r.created_by), createdOn: str(r.created_at), display: active(r.IsActive), consultant: byRef.get(str(r.MaalemDubaiRef)),
     }))
     setStored('projects', projects)

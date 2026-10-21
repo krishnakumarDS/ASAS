@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader'
 import { TextField } from '../components/ui'
 import { ACTIONS, CRUD_ENTITY_NAMES, CRUD_OPS, crudSample, sampleJson } from './flowActions'
 import { Retrieve_SQL_DataService } from '../generated'
+import FlowSuite from './FlowSuite'
 
 type Row = Record<string, unknown>
 interface Run { ms: number; ok: boolean; raw: string; tables: [string, Row[]][]; error?: string }
@@ -98,6 +99,7 @@ export default function FlowTestPage() {
           )}
         </section>
       </div>
+      <FlowSuite />
     </div>
   )
 }

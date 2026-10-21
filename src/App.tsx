@@ -13,8 +13,9 @@ import PlotWizardPage from './pages/PlotWizardPage'
 import ProjectFilesPage from './pages/ProjectFilesPage'
 import ProjectFormPage from './pages/ProjectFormPage'
 import ProjectsPage from './pages/ProjectsPage'
-import IntegrationsPage from './pages/IntegrationsPage'
+import { canUseFlowTest } from './constants/access'
 import FlowTestPage from './pages/FlowTestPage'
+import ImportPage from './pages/ImportPage'
 import NetworkPage from './pages/NetworkPage'
 import ReportsPage from './pages/ReportsPage'
 import TrendsPage from './pages/TrendsPage'
@@ -32,6 +33,12 @@ function RequireAuth({ children }: { children: ReactNode }) {
   if (!user) return <div style={{ minHeight: 'calc(100 * var(--vh))', display: 'grid', placeItems: 'center', padding: 16 }}><EmptyState title="Unable to determine the signed-in user" description={error ?? 'Open this app through the Power Platform player.'} /></div>
   if (!hasEnteredThisLoad()) return <Navigate to="/login" replace state={{ from: loc.pathname + loc.search }} />
   return <>{children}</>
+}
+
+/** The Flow test page is for one developer only; everyone else sees "Page not found". */
+function FlowTestOnly() {
+  const { user } = useAuth()
+  return canUseFlowTest(user?.email) ? <FlowTestPage /> : <EmptyState title="Page not found" description="The page you’re looking for doesn’t exist." />
 }
 
 export default function App() {
@@ -57,8 +64,8 @@ export default function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="trends" element={<TrendsPage />} />
           <Route path="network" element={<NetworkPage />} />
-          <Route path="integrations" element={<IntegrationsPage />} />
-          {import.meta.env.DEV && <Route path="flow-test" element={<FlowTestPage />} />}
+          <Route path="import" element={<ImportPage />} />
+          <Route path="flow-test" element={<FlowTestOnly />} />
           <Route path="*" element={<EmptyState title="Page not found" description="The page you’re looking for doesn’t exist." />} />
         </Route>
       </Routes>

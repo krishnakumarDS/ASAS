@@ -1,10 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowDownUp, Plus } from 'lucide-react'
+import { ArrowDownUp, Ban, CheckCircle2, Download, Plus } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import EmptyState from '../components/common/EmptyState'
+import IconButton from '../components/common/IconButton'
 import PageHeader from '../components/PageHeader'
-import { SearchBar, Tabs, matchQuery } from '../components/ui'
+import { SearchBar, Tabs, matchQuery, useToast } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
+import { userMessage } from '../data/api'
+import { syncEntity, useSyncStatus } from '../data/sync'
+import { setActiveRecord } from '../data/write'
 import { fmtDate } from '../data/mock'
 import type { Party } from '../data/mock'
 import { useConsultants, useDevelopers, useProjects } from '../data/store'
@@ -20,6 +25,10 @@ type SortKey = 'name' | 'projects' | 'created'
 export default function PartiesListPage({ kind }: { kind: Kind }) {
   const m = kindMeta[kind]
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const [toast, say] = useToast()
+  const live = useSyncStatus().state === 'live'
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [devs] = useDevelopers()
   const [cons] = useConsultants()
   const [projects] = useProjects()
@@ -37,9 +46,24 @@ export default function PartiesListPage({ kind }: { kind: Kind }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, projects, q, sort, asc, view])
 
+  // Enable / disable writes to SQL (developer.setActive / consultant.setActive: IsActive); the record is hidden, never removed, so it can be enabled again.
+  const toggle = async (r: Party) => {
+    if (!live) { say('The server can’t be reached right now: nothing was changed. Please try again.'); return }
+    setBusyId(r.id)
+    try {
+      await setActiveRecord(kind, r.id, !r.showInSO, user?.name)
+      await syncEntity(kind === 'developer' ? 'developers' : 'consultants')
+      say(`${m.one} ${r.showInSO ? 'disabled' : 'enabled'}`)
+    } catch (e) { say(userMessage(e, `Could not ${r.showInSO ? 'disable' : 'enable'} the ${m.one.toLowerCase()}`)) }
+    setBusyId(null)
+  }
+
   return (
     <div className="page">
-      <PageHeader title={m.title} subtitle={m.sub} back={false} actions={<AppButton variant="contained" startIcon={<Plus size={17} />} onClick={() => navigate(`${m.path}/new`)}>Add {m.one.toLowerCase()}</AppButton>} />
+      <PageHeader title={m.title} subtitle={m.sub} back={false} actions={<>
+        <AppButton variant="outlined" startIcon={<Download size={16} />} onClick={() => navigate(`/import?table=${kind}`)}>Import</AppButton>
+        <AppButton variant="contained" startIcon={<Plus size={17} />} onClick={() => navigate(`${m.path}/new`)}>Add {m.one.toLowerCase()}</AppButton>
+      </>} />
       <SearchBar value={q} onChange={setQ} placeholder={`Search ${m.title.toLowerCase()} by name`} resultText={`${rows.length} of ${view === 'active' ? nActive : nInactive} ${view} ${m.title.toLowerCase()}`} />
       <div className="card" style={{ overflow: 'hidden', marginBottom: 14 }}>
         <Tabs tabs={[`Active (${nActive})`, `Inactive (${nInactive})`]} active={view === 'active' ? `Active (${nActive})` : `Inactive (${nInactive})`} onChange={(t) => setView(t.startsWith('Active') ? 'active' : 'inactive')} />
@@ -53,7 +77,7 @@ export default function PartiesListPage({ kind }: { kind: Kind }) {
       {rows.length === 0 ? <div className="card"><EmptyState compact title={view === 'active' ? `No active ${m.title.toLowerCase()} found` : `No inactive ${m.title.toLowerCase()}`} /></div> : (
         <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
           {rows.map((r, i) => (
-            <button key={r.id} className="card lift pad reveal-item party" style={{ ['--index' as string]: i % 12 }} onClick={() => navigate(`${m.path}/${r.id}`)}>
+            <div key={r.id} role="button" tabIndex={0} className="card lift pad reveal-item party" style={{ ['--index' as string]: i % 12, cursor: 'pointer' }} onClick={() => navigate(`${m.path}/${r.id}`)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`${m.path}/${r.id}`) } }}>
               <div className="row" style={{ gap: 14 }}>
                 <span className="avatar lg" style={{ width: 52, height: 52, fontSize: 17 }}>{initials(r.name)}</span>
                 <div style={{ minWidth: 0, textAlign: 'left' }}>
@@ -64,11 +88,16 @@ export default function PartiesListPage({ kind }: { kind: Kind }) {
               <div className="row between" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border-light)', fontSize: 12 }}>
                 <span className="muted">By {r.createdBy.split(' ').slice(0, 2).join(' ')}</span>
                 <span className="faint">{fmtDate(r.createdOn)}</span>
+                <IconButton small title={r.showInSO ? 'Disable' : 'Enable'} aria-label={`${r.showInSO ? 'Disable' : 'Enable'} ${r.name}`} disabled={busyId === r.id}
+                  onClick={(e: React.MouseEvent) => { e.stopPropagation(); void toggle(r) }} onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}>
+                  {r.showInSO ? <Ban size={17} /> : <CheckCircle2 size={17} />}
+                </IconButton>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
+      {toast}
     </div>
   )
 }

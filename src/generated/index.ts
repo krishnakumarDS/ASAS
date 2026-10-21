@@ -4,7 +4,13 @@
  */
 
 // Models
+export * as ASAS_File_ActivationsModel from './models/ASAS_File_ActivationsModel';
+export * as ASAS_GetFilesModel from './models/ASAS_GetFilesModel';
+export * as Asas_file_StorageModel from './models/Asas_file_StorageModel';
 export * as Retrieve_SQL_DataModel from './models/Retrieve_SQL_DataModel';
 
 // Services
+export * from './services/ASAS_File_ActivationsService';
+export * from './services/ASAS_GetFilesService';
+export * from './services/Asas_file_StorageService';
 export * from './services/Retrieve_SQL_DataService';

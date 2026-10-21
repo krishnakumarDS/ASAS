@@ -2,6 +2,7 @@
 // result sets onto the shapes the screens already use. Columns come from db.md; missing ones become ''.
 import { callApi } from './api'
 import type { Row } from './api'
+import { fixName } from './names'
 
 const str = (v: unknown) => (v == null ? '' : String(v))
 const num = (v: unknown) => (v == null || v === '' || Number.isNaN(Number(v)) ? undefined : Number(v))
@@ -12,7 +13,7 @@ export interface Totals { plots?: number; tcl?: number; dcp?: number }
 const totalsOf = (r?: Row): Totals => ({ plots: num(r?.PLOTS), tcl: num(r?.TCL), dcp: num(r?.DCP) })
 
 /* ---------------- project ---------------- */
-export interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string }
+export interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string; substationId?: string }
 export interface RemarkRow { id: string; text: string; createdBy: string; createdOn: string; active: boolean }
 export interface ProjectDetail { values: Record<string, string>; existing: SubRow[]; future: SubRow[]; remarks: RemarkRow[]; totals: Totals }
 
@@ -25,7 +26,7 @@ export async function loadProject(ref: string): Promise<ProjectDetail> {
       ref: str(r.Ref), maalemNumber: str(r.MaalemDubaiNo), maalemRef: str(r.MaalemDubaiRef), name: str(r.ProjectName),
       areaMap: yn(r.AreaMap), areaMapRef: str(r.AreaMapRef), areaReport: str(r.AreaReport), zone: str(r.Zone), subZone: str(r.SubZone),
       built: str(r.BuiltPerc), underConstruction: str(r.UCPerc), vacant: str(r.VPerc),
-      engineer: str(r.Engineer), assistantEngineer: str(r.AsstEng), developer: str(r.DeveloperName),
+      engineer: str(r.Engineer), assistantEngineer: str(r.AsstEng), developer: fixName(str(r.DeveloperName)),
       masterPlanStatus: str(r.MasterPlanStatus), siteSurveyor: yn(r.SiteSurveyor), corridors: str(r.Corridors11kV), ducts: str(r.Ducts11kV),
       hvNoc: str(r.HVNOC), ss132: str(r.SS132kV), ss400: str(r.SS400kV), category: str(r.ProjectCategory),
     },
@@ -49,7 +50,7 @@ export async function loadPlot(rowId: string): Promise<Record<string, string>> {
     powerDensity: str(d.PowerDensity), gfa: str(d.GFA), landUse: str(d.LandUse), status: str(d.PlotStatus), expPower: str(d.ExpPowerReq),
     generalLoad: str(d.GenaralLoad), cooling: str(d.LocalizedCoolingLoad), dcp: str(d.DCP), tcl: str(d.TotalConnectedLoad),
     initDate: day(d.InitDevSubCommDate), ultDate: day(d.UltDevSubCommDate), noc: str(d.NOCRelease),
-    consultant: str(d.ConsultantName), developer: str(d.DeveloperName), show: yn(d.IsActive),
+    consultant: fixName(str(d.ConsultantName)), developer: fixName(str(d.DeveloperName)), show: yn(d.IsActive),
     evCharger: str(d.EVChargerLoad), dataCenter: str(d.DataCenterLoad), solar: str(d.SolarLoad), industrial: str(d.IndustrialLoad),
     lighting: str(d.LightingLoad), agritech: str(d.AgritechLoad), other: str(d.OtherLoads),
     initSub: str(s?.InitSubSCADAName), ultSub: str(s?.UltSubSCADAName),
@@ -83,7 +84,26 @@ export async function loadParty(kind: 'developer' | 'consultant', id: string): P
   return {
     url: str(h[0]?.[dev ? 'DeveloperURL' : 'ConsultantURL']),
     issues: iss.map((x, i) => ({ id: `${id}-i${i}`, ref: str(x.MaalemDubaiRef), project: str(x.ProjectName), description: str(x.Description), createdBy: '', createdOn: '', showInSO: true })),
-    projects: proj.map((x) => ({ ref: str(x.MaalemDubaiRef), name: str(x.ProjectName), other: str(dev ? x.ConsultantName : x.DeveloperName), tcl: num(x.TCL), plots: num(x.PLOTS) })),
+    projects: proj.map((x) => ({ ref: str(x.MaalemDubaiRef), name: str(x.ProjectName), other: fixName(str(dev ? x.ConsultantName : x.DeveloperName)), tcl: num(x.TCL), plots: num(x.PLOTS) })),
     totals: totalsOf(tot[0]),
   }
+}
+
+/* ---------- a project's existing and future substations, with the row ids needed to remove them ---------- */
+const on = (v: unknown) => (v == null || v === '' ? true : v === true || v === 1 || /^(true|1|yes|y)$/i.test(String(v)))
+
+export async function loadProjectSubstations(ref: string): Promise<{ existing: SubRow[]; future: SubRow[] }> {
+  const page = { maalemDubaiRef: ref, pageSize: 500, pageNumber: 1 }
+  const [ex, fu] = await Promise.all([callApi('ViewProjExistingKVSS', page), callApi('ViewProjFutureYears', page)])
+  const row = (x: Row): SubRow => ({ id: str(x.RowId), name: str(x.SubstationName), status: str(x.Status), createdOn: str(x.created_at), createdBy: str(x.created_by), active: on(x.IsActive), scada: str(x.SubstationSCADAName), substationId: str(x.SubstationID) })
+  return {
+    existing: (ex[0] ?? []).map(row),
+    future: (fu[0] ?? []).map((x) => ({ ...row(x), commissioning: [str(x.ProjectYear), str(x.Remark)].filter(Boolean).join(' · ') })),
+  }
+}
+
+/* ---------- a project's remarks (UC000420_ProjectsRemarks), with the row ids needed to edit or hide them ---------- */
+export async function loadProjectRemarks(ref: string): Promise<RemarkRow[]> {
+  const t = await callApi('ViewProjRemarks', { maalemDubaiRef: ref, pageSize: 500, pageNumber: 1 })
+  return (t[0] ?? []).map((x) => ({ id: str(x.RowId), text: str(x.Remarks), createdBy: str(x.created_by), createdOn: str(x.created_at), active: on(x.IsActive) }))
 }

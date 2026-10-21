@@ -207,7 +207,7 @@ button.chip:hover { background: var(--accent-50); border-color: var(--accent-100
 .vnav button.on { background: var(--accent-50); color: var(--accent-600); font-weight: 600; }
 @media (max-width: 960px) { .split { grid-template-columns: 1fr; } .vnav { position: static; display: flex; overflow-x: auto; gap: 4px; } .vnav button { width: auto; white-space: nowrap; } }
 
-button.party { text-align: left; display: block; width: 100%; cursor: pointer; }
+.party { text-align: left; display: block; width: 100%; cursor: pointer; }
 .report { display: block; border-top: 3px solid var(--tone); }
 .report-ico { width: 44px; height: 44px; border-radius: var(--radius-md); display: grid; place-items: center; color: var(--tone); background: color-mix(in srgb, var(--tone) 12%, transparent); flex-shrink: 0; }
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { Download, Eye, EyeOff, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
 import ConfirmationDialog from '../components/common/ConfirmationDialog'
 import IconButton from '../components/common/IconButton'
@@ -44,6 +44,7 @@ export default function SubstationsPage() {
     <div className="page">
       <PageHeader title="Substations" subtitle="Substation records, SCADA names and standard limits" back={false} actions={
         <>
+          <AppButton variant="outlined" startIcon={<Download size={16} />} onClick={() => navigate('/import?table=substation')}>Import</AppButton>
           <AppButton variant="outlined" startIcon={<SlidersHorizontal size={16} />} onClick={() => navigate('/substations/limits')}>Standard limits</AppButton>
           <AppButton variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate('/substations/new')}>Add substation</AppButton>
         </>

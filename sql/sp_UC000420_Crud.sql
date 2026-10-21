@@ -15,6 +15,7 @@
     delete     soft delete (IsActive = 0) when the table has IsActive, otherwise removes the row.  {"id":12,"user":"jane"}
     get        one row by key.             {"id":12}
     list       a page of rows.             {"pageSize":50,"pageNumber":1,"isActive":true}                    -> rows, then TotalCount
+    columns    the table's columns and data types (read-only; used by the importer).  {}        -> Name, DataType, MaxLength, Nullable, IsIdentity
     createMany    insert many rows in ONE call (bulk upload).  {"rows":[{…},{…}],"user":"jane"}              -> one Id per row
     setActiveMany show / hide many rows in ONE call.           {"ids":[1,2,3],"isActive":false,"user":"jane"} -> Requested, RowsAffected
     deleteMany    soft delete many rows in ONE call.           {"ids":[1,2,3],"user":"jane"}                 -> Requested, RowsAffected
@@ -94,7 +95,7 @@ BEGIN
       WHEN N'substationLimit'       THEN N'UC000420_Substation_Limits_TCL'
       ELSE NULL END;
   IF @table IS NULL THROW 51003, 'Unknown entity', 1;
-  IF @operation NOT IN (N'create', N'update', N'setActive', N'delete', N'get', N'list', N'createMany', N'setActiveMany', N'deleteMany') THROW 51004, 'Unknown operation', 1;
+  IF @operation NOT IN (N'create', N'update', N'setActive', N'delete', N'get', N'list', N'createMany', N'setActiveMany', N'deleteMany', N'columns') THROW 51004, 'Unknown operation', 1;
 
   DECLARE @sqlTable nvarchar(300) = N'dbo.' + QUOTENAME(@table);
   DECLARE @obj int = OBJECT_ID(@sqlTable);
@@ -185,6 +186,14 @@ BEGIN
   DECLARE @extraCols nvarchar(max) = N'', @extraVals nvarchar(max) = N'', @extraSet nvarchar(max) = N'', @where nvarchar(max) = N'';
 
   /* ---------- 6. reads ---------- */
+  IF @operation = N'columns'
+  BEGIN
+    SELECT c.name AS Name, ty.name AS DataType, c.max_length AS MaxLength, c.is_nullable AS Nullable, c.is_identity AS IsIdentity
+    FROM sys.columns c JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+    WHERE c.object_id = @obj ORDER BY c.column_id;
+    RETURN;
+  END
+
   IF @operation = N'get'
   BEGIN
     IF @id IS NULL THROW 51010, 'id is required', 1;

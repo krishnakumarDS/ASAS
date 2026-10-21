@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw, RotateCcw, Bell, LogOut, Menu, Moon, Search, Settings, Sun, UserRound } from 'lucide-react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { DEWA_LOGO_WHITE } from '../../assets/logos'
+import { canUseFlowTest } from '../../constants/access'
 import { NAV_GROUPS } from '../../constants/navigation'
 import { useAuth } from '../../context/AuthContext'
 import { fmtDate } from '../../data/mock'
@@ -9,6 +10,7 @@ import { clearStored, refreshStored, snapshot } from '../../data/store'
 import { markLeft } from '../../data/session'
 import { useApiBusy } from '../../data/api'
 import { startSync, syncFromDatabase, useDataReady, useSyncStatus } from '../../data/sync'
+import { syncFiles } from '../../data/spFiles'
 import { PageLoader, Spinner } from '../Loader'
 import { useTheme } from '../../context/ThemeContext'
 import ConfirmationDialog from '../common/ConfirmationDialog'
@@ -50,6 +52,7 @@ export default function AppLayout() {
     setSpin(true)
     refreshStored()
     void syncFromDatabase(true) // Refresh: load all the lists again
+    void syncFiles()
     setRefreshKey((k) => k + 1)
     setTimeout(() => setSpin(false), 700)
   }
@@ -58,6 +61,8 @@ export default function AppLayout() {
   useEffect(() => setOpen(false), [pathname])
   // Opening the app: use the lists stored in this browser; only the first visit (or a Reset) loads them from the server.
   useEffect(() => { if (user) void startSync(user.id) }, [user])
+  // The SharePoint file list is read on every open (one flow call) and kept in the store for the project Files screens.
+  useEffect(() => { if (user) void syncFiles() }, [user])
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 961px)')
     const h = () => setDesktop(mq.matches)
@@ -80,7 +85,7 @@ export default function AppLayout() {
           {NAV_GROUPS.map((g) => (
             <div key={g.id} className={styles.group}>
               <div className={styles.groupTitle}>{g.label}</div>
-              {g.items.map(({ id, label, icon: Icon, path }) => (
+              {g.items.filter((i) => !i.flowTestOnly || canUseFlowTest(user?.email)).map(({ id, label, icon: Icon, path }) => (
                 <NavLink key={id} to={path} end={path === '/'} title={label} className={`${styles.item} ${isActive(path) ? styles.active : ''}`} aria-current={isActive(path) ? 'page' : undefined}>
                   <Icon size={19} /><span className={styles.label}>{label}</span>
                 </NavLink>
