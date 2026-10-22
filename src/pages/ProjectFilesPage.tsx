@@ -10,7 +10,7 @@ import IconButton from '../components/common/IconButton'
 import { ActionsMenu, DataTable, FileDrop, Modal, SelectField, TextField, useToast } from '../components/ui'
 import { fmtDate } from '../data/mock'
 import { uploadFile } from '../data/files'
-import { downloadUrl, filesIn, setTabActive, splitTab, syncFiles, useFilesStatus, useSpFiles } from '../data/spFiles'
+import { downloadUrl, filesIn, setFileActive, splitTab, syncFiles, useFilesStatus, useSpFiles } from '../data/spFiles'
 import type { SpFile } from '../data/spFiles'
 import { errorDetail, userMessage } from '../data/api'
 import { getStored, newId, usePersistent, useProjects, useSubstations } from '../data/store'
@@ -60,12 +60,12 @@ export default function ProjectFilesPage() {
   const spStatus = useFilesStatus()
   // The files of a tab come from SharePoint (<project ref>/<tab>): the newest is the active one, older ones are in-active.
   const tabFiles = useMemo(() => filesIn(sp.items, project?.maalemRef ?? id, tab), [sp.items, project?.maalemRef, id, tab])
-  const { active: activeFile, inactive: inactiveFiles } = useMemo(() => splitTab(tabFiles), [tabFiles])
+  const { active: activeFiles, inactive: inactiveFiles } = useMemo(() => splitTab(tabFiles), [tabFiles])
   const [switching, setSwitching] = useState(false)
-  // Active / in-active is the Status column of the file in SharePoint (ASAS_File_Activations flow). One active file per tab: making one active makes the others in-active.
-  const activate = async (target: SpFile | null) => {
+  // Active / in-active is the Status column of the file in SharePoint (ASAS_File_Activations flow). Any number of files can be active; each is switched on its own.
+  const activate = async (target: SpFile, active: boolean) => {
     setSwitching(true)
-    try { await setTabActive(project?.maalemRef ?? id, tab, target); say(target ? 'File is now active' : 'File set to in-active') }
+    try { await setFileActive(project?.maalemRef ?? id, tab, target, active); say(active ? 'File is now active' : 'File set to in-active') }
     catch (e) { console.error(e); say(`The file status could not be changed: ${errorDetail(e)}`) }
     setSwitching(false)
   }
@@ -90,7 +90,7 @@ export default function ProjectFilesPage() {
       catch (e) { say(userMessage(e, 'The file could not be uploaded. Please try again.')); setUploading(false); return }
       await syncFiles() // the new file is read back from SharePoint
       const newest = filesIn(getStored<{ items: SpFile[] }>('spFiles', { items: [] }).items, project?.maalemRef ?? id, tab)[0]
-      if (newest && isFileTabName(tab)) { try { await setTabActive(project?.maalemRef ?? id, tab, newest) } catch (e) { say(`The file was uploaded, but it could not be made active: ${errorDetail(e)}`) } }
+      if (newest && isFileTabName(tab)) { try { await setFileActive(project?.maalemRef ?? id, tab, newest, true) } catch (e) { say(`The file was uploaded, but it could not be made active: ${errorDetail(e)}`) } }
       setUploading(false)
     }
     if (tab === 'Issues') setIssues((p) => [...p, { id: uid(), description: desc, fileName: file?.name ?? '', createdBy: ME, createdOn: now(), active: true }])
@@ -118,19 +118,23 @@ export default function ProjectFilesPage() {
             <>
               <section className="card pad">
                 <div className="row between wrap" style={{ gap: 12, marginBottom: 14 }}>
-                  <div><h4>{tab}</h4><p className="muted" style={{ fontSize: 13 }}>Active file in Smart Office</p></div>
+                  <div><h4>{tab}</h4><p className="muted" style={{ fontSize: 13 }}>Active files in Smart Office</p></div>
                   <div className="row wrap">
                     <AppButton variant="outlined" startIcon={<RefreshCw size={15} />} loading={spStatus === 'loading'} onClick={() => { void syncFiles().then((ok) => say(ok ? 'Refreshed' : 'The file list could not be loaded. Please try again.')) }}>Refresh</AppButton>
                     <AppButton variant="contained" startIcon={<Upload size={15} />} onClick={() => setModal(true)}>Upload new file</AppButton>
                   </div>
                 </div>
-                {activeFile ? (
-                  <div className="row" style={{ gap: 12, padding: '14px 16px', background: 'var(--accent-50)', border: '1px solid var(--accent-100)', borderRadius: 'var(--radius-md)', color: 'var(--accent-600)', fontWeight: 600 }}>
-                    <FileText size={18} /><a href={activeFile.link} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{activeFile.name}</a>
-                    <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>{activeFile.by} · {fmtDate(activeFile.modified)}</span>
-                    <span className="badge badge-success" style={{ marginLeft: 'auto' }}>Active</span>
-                    <IconButton small title="Download" aria-label={`Download ${activeFile.name}`} onClick={() => download(activeFile)}><Download size={17} /></IconButton>
-                    <AppButton variant="outlined" size="small" loading={switching} onClick={() => { void activate(null) }}>Make in-active</AppButton>
+                {activeFiles.length > 0 ? (
+                  <div className="stack" style={{ gap: 8 }}>
+                    {activeFiles.map((f) => (
+                      <div key={f.id} className="row" style={{ gap: 12, padding: '14px 16px', background: 'var(--accent-50)', border: '1px solid var(--accent-100)', borderRadius: 'var(--radius-md)', color: 'var(--accent-600)', fontWeight: 600 }}>
+                        <FileText size={18} /><a href={f.link} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{f.name}</a>
+                        <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>{f.by} · {fmtDate(f.modified)}</span>
+                        <span className="badge badge-success" style={{ marginLeft: 'auto' }}>Active</span>
+                        <IconButton small title="Download" aria-label={`Download ${f.name}`} onClick={() => download(f)}><Download size={17} /></IconButton>
+                        <AppButton variant="outlined" size="small" disabled={switching} onClick={() => { void activate(f, false) }}>Make in-active</AppButton>
+                      </div>
+                    ))}
                   </div>
                 ) : spStatus === 'loading' && !sp.at ? <p className="row" style={{ gap: 8 }}><span className="spinner" /> Loading files…</p>
                   : <EmptyState compact title="No active file" description="Upload a file, or make one of the in-active files active." />}
@@ -144,7 +148,7 @@ export default function ProjectFilesPage() {
                     { header: 'File name', render: (r) => <a href={r.link} target="_blank" rel="noreferrer"><strong>{r.name}</strong></a> },
                     { header: 'Uploaded', render: (r) => <><div>{r.by}</div><div className="cell-sub">{fmtDate(r.modified)}</div></> },
                     { header: 'Active', render: () => <StatusChip status="inactive" label="false" /> },
-                    { header: '', align: 'right', render: (r) => <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}><IconButton small title="Download" aria-label={`Download ${r.name}`} onClick={() => download(r)}><Download size={17} /></IconButton><AppButton variant="outlined" size="small" disabled={switching} onClick={() => { void activate(r) }}>Make active</AppButton></div> },
+                    { header: '', align: 'right', render: (r) => <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}><IconButton small title="Download" aria-label={`Download ${r.name}`} onClick={() => download(r)}><Download size={17} /></IconButton><AppButton variant="outlined" size="small" disabled={switching} onClick={() => { void activate(r, true) }}>Make active</AppButton></div> },
                   ]}
                 />
               </section>

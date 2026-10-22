@@ -37,7 +37,7 @@ export default function SubstationsPage() {
   }
   const [q, setQ] = useState('')
   const filtered = useMemo(() => rows.filter((s) => s.showInSO === (view === 'active') && matchQuery(`${s.name} ${s.scada} ${s.builtBy} ${s.showInSO ? 'shown smart office' : 'hidden smart office'} ${s.createdBy}`, q)), [rows, q, view])
-  const { sorted, sortFor } = useSort(filtered, { name: (s) => s.name, builtBy: (s) => s.builtBy, so: (s) => String(s.showInSO), created: (s) => s.createdOn })
+  const { sorted, sortFor } = useSort(filtered, { name: (s) => s.name, builtBy: (s) => s.builtBy, scada: (s) => s.scada, createdBy: (s) => s.createdBy, so: (s) => String(s.showInSO), created: (s) => s.createdOn })
   const { visible, page, pages, setPage } = usePaged(sorted, 10)
 
   return (
@@ -55,10 +55,12 @@ export default function SubstationsPage() {
         <DataTable<Substation>
           rows={visible} empty={view === 'active' ? 'No active substations match your search.' : 'No inactive substations.'}
           columns={[
-            { header: 'Substation', sort: sortFor('name'), render: (r) => <><a href="#" className="link cell-title" onClick={(e) => { e.preventDefault(); navigate(`/substations/${r.id}`) }}>{r.name}</a><div className="cell-sub num">{r.scada}</div></> },
-            { header: 'Built by', sort: sortFor('builtBy'), render: (r) => <span className={`badge ${r.builtBy === 'DEWA' ? 'badge-accent' : 'badge-neutral'}`}>{r.builtBy}</span> },
-            { header: 'Smart Office', sort: sortFor('so'), render: (r) => <span className={`badge ${r.showInSO ? 'badge-success' : 'badge-neutral'}`}>{r.showInSO ? 'Shown' : 'Hidden'}</span> },
-            { header: 'Created', sort: sortFor('created'), render: (r) => <><div>{r.createdBy}</div><div className="cell-sub">{fmtDate(r.createdOn)}</div></> },
+            { header: 'Substation Name', sort: sortFor('name'), render: (r) => <a href="#" className="link cell-title" onClick={(e) => { e.preventDefault(); navigate(`/substations/${r.id}`) }}>{r.name}</a> },
+            { header: 'Substation SCADA Name', sort: sortFor('scada'), render: (r) => <span className="num">{r.scada}</span> },
+            { header: 'Built By', sort: sortFor('builtBy'), render: (r) => <span className={`badge ${r.builtBy === 'DEWA' ? 'badge-accent' : 'badge-neutral'}`}>{r.builtBy}</span> },
+            { header: 'Show in Smart Office', sort: sortFor('so'), render: (r) => <span className={`badge ${r.showInSO ? 'badge-success' : 'badge-neutral'}`}>{r.showInSO ? 'Shown' : 'Hidden'}</span> },
+            { header: 'Created On', sort: sortFor('created'), render: (r) => fmtDate(r.createdOn) },
+            { header: 'Created By', sort: sortFor('createdBy'), render: (r) => r.createdBy },
             { header: 'Actions', align: 'right', render: (r) => (
               <div className="row" style={{ justifyContent: 'flex-end', gap: 2 }}>
                 <IconButton small title="Edit" aria-label="Edit" onClick={() => navigate(`/substations/${r.id}`)}><Pencil size={17} /></IconButton>

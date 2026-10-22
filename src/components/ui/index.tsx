@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { placeFixed } from '../placeFixed'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, Columns3, MoreVertical, Search, SlidersHorizontal, Upload, X } from 'lucide-react'
@@ -162,6 +163,7 @@ function HeaderMenu({ sort, icon, all, hidden, toggleColumn }: { sort?: Column<n
     window.addEventListener('resize', close)
     return () => { document.removeEventListener('mousedown', down); window.removeEventListener('scroll', move, true); window.removeEventListener('resize', close) }
   }, [open])
+  useLayoutEffect(() => { if (pos && pop.current) placeFixed(pop.current, pos.left, pos.top) }, [pos])
   const toggle = () => {
     if (open) { close(); return }
     const r = btn.current?.getBoundingClientRect()
@@ -268,12 +270,22 @@ export function ActionsMenu({ items }: { items: { label: string; onClick: () => 
   useEffect(() => {
     if (!open) return
     const close = () => setPos(null)
+    const t0 = performance.now()
+    // A scroll right after opening (the page settling, e.g. for a row near the bottom of the window) must not close the menu at once; a scroll inside the menu never does.
+    const onScroll = (e: Event) => { if (performance.now() - t0 > 300 && !pop.current?.contains(e.target as Node)) close() }
     const down = (e: MouseEvent) => { const t = e.target as Node; if (!btn.current?.contains(t) && !pop.current?.contains(t)) close() }
     document.addEventListener('mousedown', down)
-    window.addEventListener('scroll', close, true)
+    window.addEventListener('scroll', onScroll, true)
     window.addEventListener('resize', close)
-    return () => { document.removeEventListener('mousedown', down); window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close) }
+    return () => { document.removeEventListener('mousedown', down); window.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', close) }
   }, [open])
+  // Once drawn, place the list by its real size: below the button when it fits, otherwise above it, never outside the window, and corrected for the page zoom (see placeFixed).
+  useLayoutEffect(() => {
+    if (!pos || !pop.current || !btn.current) return
+    const r = btn.current.getBoundingClientRect(), pr = pop.current.getBoundingClientRect()
+    const top = window.innerHeight - r.bottom - 8 >= pr.height ? r.bottom + 6 : Math.max(8, r.top - pr.height - 6)
+    placeFixed(pop.current, Math.max(8, r.right - pr.width), top)
+  }, [pos])
   const toggle = () => {
     if (open) { setPos(null); return }
     const r = btn.current?.getBoundingClientRect()

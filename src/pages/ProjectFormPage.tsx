@@ -50,7 +50,7 @@ const NO_SUBS: SubRow[] = []
 const NO_REMARKS: Remark[] = []
 
 type Picker = null | 'developer' | 'consultant'
-interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string; substationId?: string }
+interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string; substationId?: string; year?: string; remark?: string }
 interface Remark { id: string; text: string; createdBy: string; createdOn: string; active: boolean }
 
 export default function ProjectFormPage() {
@@ -77,7 +77,8 @@ export default function ProjectFormPage() {
   const seedExisting = useMemo<SubRow[]>(() => { const sub = /^\d+$/.test(id) ? allSubs[(Number(id) * 3) % Math.max(1, allSubs.length)] : undefined; return sub ? [{ id: `s${id}`, name: sub.name, status: sub.builtBy, createdOn: sub.createdOn, createdBy: sub.createdBy, active: true, scada: sub.scada }] : NO_SUBS }, [id])
   const [existing, setExisting] = usePersistent<SubRow[]>(`project:${id}:existing`, seedExisting)
   const [future, setFuture] = usePersistent<SubRow[]>(`project:${id}:future`, NO_SUBS)
-  const [subModal, setSubModal] = useState<null | 'existing' | 'future'>(null)
+  // The substation dialog: which table, and whether it adds a row or shows / edits an existing one.
+  const [subModal, setSubModal] = useState<null | { kind: 'existing' | 'future'; mode: 'add' | 'view' | 'edit'; row?: SubRow }>(null)
   const [subSaving, setSubSaving] = useState(false)
   const [remarks, setRemarks] = usePersistent<Remark[]>(`project:${id}:remarks`, NO_REMARKS)
   const [remarkModal, setRemarkModal] = useState<null | 'new' | Remark>(null) // 'new' = add, a remark = edit it
@@ -119,23 +120,27 @@ export default function ProjectFormPage() {
   const live = useSyncStatus().state === 'live'
   const [saving, setSaving] = useState(false)
 
-  // Adding a substation: search popup, then the confirm form; Save writes to SQL (existingKVSS.create / projectFutureYear.create).
+  // Adding or editing a substation: search popup, then the confirm form; Save writes to SQL (existingKVSS.create / .update, projectFutureYear.create / .update).
   const addSubstation = async (e: SubstationEntry) => {
-    const kind = subModal
+    const kind = subModal?.kind
+    const editing = subModal?.mode === 'edit' ? subModal.row : undefined
     if (!kind) return
     if (!fromDb) { // a sample project that is not in the database: keep it in this browser only
-      const r: SubRow = { id: newId(), name: e.substation.name, status: e.status, createdOn: new Date().toISOString(), createdBy: user?.name ?? 'Unknown', active: e.display === 'true', scada: e.substation.scada, substationId: e.substation.id, commissioning: e.year }
-      ;(kind === 'future' ? setFuture : setExisting)((p) => [...p, r]); setSubModal(null); say('Substation added'); return
+      const set = kind === 'future' ? setFuture : setExisting
+      const fields = { name: e.substation.name, status: e.status, active: e.display === 'true', scada: e.substation.scada, substationId: e.substation.id, commissioning: e.year, year: e.year }
+      if (editing) set((p) => p.map((x) => (x.id === editing.id ? { ...x, ...fields } : x)))
+      else set((p) => [...p, { id: newId(), createdOn: new Date().toISOString(), createdBy: user?.name ?? 'Unknown', ...fields }])
+      setSubModal(null); say(editing ? 'Substation updated' : 'Substation added'); return
     }
     if (!live) { say('The server can’t be reached right now: nothing was saved. Please try again.'); return }
     setSubSaving(true)
     try {
-      await saveRecord(kind === 'future' ? 'projectFutureYear' : 'existingKVSS', null, {
+      await saveRecord(kind === 'future' ? 'projectFutureYear' : 'existingKVSS', editing ? editing.id : null, {
         MaalemDubaiRef: id, SubstationID: Number(e.substation.id), Status: e.status, IsActive: e.display === 'true',
-        ...(kind === 'future' ? { ProjectYear: e.year, Remark: e.remark } : {}),
+        ...(kind === 'future' ? { ProjectYear: e.year, ...(editing ? {} : { Remark: e.remark }) } : {}),
       }, user?.name)
-      setSubsKey((k) => k + 1); setSubModal(null); say('Substation added')
-    } catch (err) { say(userMessage(err, 'Could not add the substation')) }
+      setSubsKey((k) => k + 1); setSubModal(null); say(editing ? 'Substation updated' : 'Substation added')
+    } catch (err) { say(userMessage(err, editing ? 'Could not update the substation' : 'Could not add the substation')) }
     setSubSaving(false)
   }
   // Add / edit a remark: Save writes to UC000420_ProjectsRemarks (projectRemark.create / projectRemark.update).
@@ -261,7 +266,7 @@ export default function ProjectFormPage() {
               const rows = kind === 'existing' ? existing : future
               return (
                 <section key={kind} className="card" style={{ overflow: 'hidden' }}>
-                  <div className="card-head"><h4>{kind === 'existing' ? 'Existing substations' : 'Future substations'}</h4><AppButton variant="contained" size="small" startIcon={<Plus size={15} />} onClick={() => setSubModal(kind)}>Add</AppButton></div>
+                  <div className="card-head"><h4>{kind === 'existing' ? 'Existing substations' : 'Future substations'}</h4><AppButton variant="contained" size="small" startIcon={<Plus size={15} />} onClick={() => setSubModal({ kind, mode: 'add' })}>Add</AppButton></div>
                   <DataTable<SubRow>
                     rows={rows} empty={`No ${kind} substations yet.`}
                     columns={[
@@ -271,7 +276,7 @@ export default function ProjectFormPage() {
                       { header: 'Created', render: (r) => <><div>{r.createdBy}</div><div className="cell-sub">{fmtDate(r.createdOn)}</div></> },
                       { header: 'Active', render: (r) => <StatusChip status={r.active ? 'active' : 'inactive'} label={String(r.active)} /> },
                       { header: 'SCADA', render: (r) => r.scada },
-                      { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'Delete', danger: true, onClick: () => { void removeSubstation(kind, r) } }]} /> },
+                      { header: '', align: 'right', render: (r) => <ActionsMenu items={[{ label: 'View', onClick: () => setSubModal({ kind, mode: 'view', row: r }) }, { label: 'Edit', onClick: () => setSubModal({ kind, mode: 'edit', row: r }) }, { label: 'Delete', danger: true, onClick: () => { void removeSubstation(kind, r) } }]} /> },
                     ]}
                   />
                 </section>
@@ -300,7 +305,14 @@ export default function ProjectFormPage() {
 
       {picker === 'developer' && <LookupModal title="Select developer" items={devs.filter((d) => d.showInSO).map((d) => d.name)} onPick={(x) => set('developer', x)} onClose={() => setPicker(null)} />}
       {picker === 'consultant' && <LookupModal title="Select consultant" items={cons.filter((d) => d.showInSO).map((d) => d.name)} onPick={(x) => set('consultant', x)} onClose={() => setPicker(null)} />}
-      {subModal && <SubstationEntryModal future={subModal === 'future'} substations={allSubs.filter((s) => s.showInSO)} taken={new Set((subModal === 'future' ? future : existing).filter((r) => r.active).map((r) => r.substationId ?? ''))} saving={subSaving} onClose={() => setSubModal(null)} onSave={addSubstation} />}
+      {subModal && (() => {
+        const { kind, mode, row } = subModal
+        const list = kind === 'future' ? future : existing
+        // the row's own substation is not "already in the list" while it is being edited
+        const taken = new Set(list.filter((r) => r.active && r.id !== row?.id).map((r) => r.substationId ?? ''))
+        const initial = row && { substation: allSubs.find((x) => x.id === row.substationId) ?? { id: row.substationId ?? '', name: row.name, scada: row.scada, builtBy: (/dewa/i.test(row.status) ? 'DEWA' : 'Developer') as 'DEWA' | 'Developer', showInSO: true, createdOn: '', createdBy: '' }, status: row.status, display: (row.active ? 'true' : 'false') as 'true' | 'false', year: row.year ?? (row.commissioning ?? '').split(' · ')[0] }
+        return <SubstationEntryModal key={`${kind}-${mode}-${row?.id ?? 'new'}`} future={kind === 'future'} mode={mode} initial={initial} substations={allSubs.filter((x) => x.showInSO)} taken={taken} saving={subSaving} onClose={() => setSubModal(null)} onSave={addSubstation} />
+      })()}
       {remarkModal && <RemarkModal initial={remarkModal === 'new' ? undefined : remarkModal} saving={remarkSaving} onClose={() => setRemarkModal(null)} onSave={saveRemark} />}
       {toast}
     </div>

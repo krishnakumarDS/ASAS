@@ -13,7 +13,7 @@ export interface Totals { plots?: number; tcl?: number; dcp?: number }
 const totalsOf = (r?: Row): Totals => ({ plots: num(r?.PLOTS), tcl: num(r?.TCL), dcp: num(r?.DCP) })
 
 /* ---------------- project ---------------- */
-export interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string; substationId?: string }
+export interface SubRow { id: string; name: string; status: string; createdOn: string; createdBy: string; active: boolean; scada: string; commissioning?: string; substationId?: string; year?: string; remark?: string }
 export interface RemarkRow { id: string; text: string; createdBy: string; createdOn: string; active: boolean }
 export interface ProjectDetail { values: Record<string, string>; existing: SubRow[]; future: SubRow[]; remarks: RemarkRow[]; totals: Totals }
 
@@ -58,17 +58,23 @@ export async function loadPlot(rowId: string): Promise<Record<string, string>> {
 }
 
 /* ---------------- substation ---------------- */
+export interface LimitHistoryRow { id: string; amount: string; description: string; createdOn: string; createdBy: string; active: boolean }
 export interface SubstationDetail {
-  name: string; scada: string; builtBy: string; limits: { id: string; amount: string; description: string }[]
+  name: string; scada: string; builtBy: string; limits: { id: string; amount: string; description: string }[]; history: LimitHistoryRow[]
   totals: Totals; projects: { id: string; ref: string; name: string; plots: number; tcl: number }[]
 }
 export async function loadSubstation(id: string): Promise<SubstationDetail> {
-  const [h = [], lim = [], tot = [], proj = []] = await callApi('ViewSubDetails_SO', { substationId: Number(id) })
+  // the limit history (every limit the substation has had, with who set it and when) is a separate call; without it the tab just shows the current limit
+  const [[h = [], lim = [], tot = [], proj = []], hist] = await Promise.all([
+    callApi('ViewSubDetails_SO', { substationId: Number(id) }),
+    callApi('ViewSubstation_Limits', { substationId: Number(id) }).catch(() => [] as Row[][]),
+  ])
   const r = h[0]
   if (!r) throw new Error('This substation was not found.')
   return {
     name: str(r.SubstationName), scada: str(r.SubstationSCADAName), builtBy: /dewa/i.test(str(r.BuiltBy)) ? 'DEWA' : str(r.BuiltBy) ? 'Developer' : '',
     limits: lim.map((l, i) => ({ id: `${id}-l${i}`, amount: str(l.LimitAmount), description: str(l.LimitDesc) })),
+    history: (hist[0] ?? []).map((l, i) => ({ id: `${id}-h${i}`, amount: str(l.LimitAmount), description: str(l.LimitDesc), createdOn: str(l.created_at), createdBy: str(l.created_by), active: on(l.IsActive) })),
     totals: totalsOf(tot[0]),
     projects: proj.map((p) => ({ id: str(p.MaalemDubaiRef), ref: str(p.MaalemDubaiRef), name: str(p.ProjectName), plots: Number(p.TotalPlots ?? 0), tcl: Number(p.TCL ?? 0) })),
   }
@@ -98,7 +104,7 @@ export async function loadProjectSubstations(ref: string): Promise<{ existing: S
   const row = (x: Row): SubRow => ({ id: str(x.RowId), name: str(x.SubstationName), status: str(x.Status), createdOn: str(x.created_at), createdBy: str(x.created_by), active: on(x.IsActive), scada: str(x.SubstationSCADAName), substationId: str(x.SubstationID) })
   return {
     existing: (ex[0] ?? []).map(row),
-    future: (fu[0] ?? []).map((x) => ({ ...row(x), commissioning: [str(x.ProjectYear), str(x.Remark)].filter(Boolean).join(' · ') })),
+    future: (fu[0] ?? []).map((x) => ({ ...row(x), year: str(x.ProjectYear), remark: str(x.Remark), commissioning: [str(x.ProjectYear), str(x.Remark)].filter(Boolean).join(' · ') })),
   }
 }
 

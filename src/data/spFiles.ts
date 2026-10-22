@@ -54,27 +54,29 @@ export function syncFiles(): Promise<boolean> {
 }
 
 const isActive = (f: SpFile) => /^active$/i.test(f.status)
-/** One tab's files as Active (at most one) and In-active. Once the app has set a Status on any file, Status decides; before that the newest file counts as active. */
-export function splitTab(files: SpFile[]): { active?: SpFile; inactive: SpFile[] } {
-  const active = files.some((f) => f.status) ? files.find(isActive) : files[0]
-  return { active, inactive: files.filter((f) => f !== active) }
+/** One tab's files as Active (any number) and In-active. Once the app has set a Status on any file in the tab, Status decides; before that the newest file counts as active. */
+export function splitTab(files: SpFile[]): { active: SpFile[]; inactive: SpFile[] } {
+  if (!files.some((f) => f.status)) return { active: files.slice(0, 1), inactive: files.slice(1) }
+  return { active: files.filter(isActive), inactive: files.filter((f) => !isActive(f)) }
 }
 
-/** Makes `target` the tab's only active file (null = none): sets Active on it and Inactive on the others, one flow call per file that changes.
- *  The flow has no response step, so the stored list is updated here instead of read back. Throws if a call fails (the files already changed stay changed). */
-export async function setTabActive(ref: string, tab: string, target: SpFile | null): Promise<void> {
-  const state = getStored<SpState>('spFiles', NONE)
-  const files = filesIn(state.items, ref, tab)
+/** Sets one file Active or Inactive (one flow call; the other files of the tab are not touched).
+ *  The flow has no response step, so the stored list is updated here instead of read back. Before any status exists in the tab, the newest file was
+ *  active by default: it is written out first so that changing another file does not silently switch it. */
+export async function setFileActive(ref: string, tab: string, target: SpFile, active: boolean): Promise<void> {
+  const tabFiles = filesIn(getStored<SpState>('spFiles', NONE).items, ref, tab)
+  const changes = new Map<string, 'Active' | 'Inactive'>()
+  if (!tabFiles.some((f) => f.status)) tabFiles.forEach((f, i) => changes.set(f.id, i === 0 ? 'Active' : 'Inactive'))
+  changes.set(target.id, active ? 'Active' : 'Inactive')
   const done = new Map<string, string>()
   try {
-    for (const f of files) {
-      const want = f === target || (target && f.id === target.id) ? 'Active' : 'Inactive'
-      if (f.status.toLowerCase() === want.toLowerCase()) continue
-      await setFileStatus(Number(f.id), want)
-      done.set(f.id, want)
-    }
+    for (const [id, want] of changes) { await setFileStatus(Number(id), want); done.set(id, want) }
   } finally {
-    if (done.size) setStored<SpState>('spFiles', { ...state, items: getStored<SpState>('spFiles', NONE).items.map((f) => (done.has(f.id) && f.folder.toLowerCase() === `${SP_ROOT}/${ref}/${tab}`.toLowerCase() ? { ...f, status: done.get(f.id)! } : f)) })
+    if (done.size) {
+      const state = getStored<SpState>('spFiles', NONE)
+      const folder = `${SP_ROOT}/${ref}/${tab}`.toLowerCase()
+      setStored<SpState>('spFiles', { ...state, items: state.items.map((f) => (done.has(f.id) && f.folder.toLowerCase() === folder ? { ...f, status: done.get(f.id)! } : f)) })
+    }
   }
 }
 
@@ -84,5 +86,17 @@ export function filesIn(items: SpFile[], ref: string, tab: string): SpFile[] {
   return items.filter((f) => !f.isFolder && f.folder.toLowerCase() === folder).sort((a, b) => b.modified.localeCompare(a.modified))
 }
 
-/** The file's SharePoint address in a form that downloads it instead of opening it (?download=1). The share parameter (?d=…) that {Link} carries is dropped. */
-export const downloadUrl = (f: SpFile): string => (f.link ? `${f.link.split('?')[0]}?download=1` : '')
+/** An address that makes SharePoint send the file as a download (also for Excel / Word / PowerPoint, which a plain link or ?download=1 can open in the web viewer):
+ *  <site>/_layouts/15/download.aspx?SourceUrl=<the file's server-relative path>. Falls back to ?download=1 if the link cannot be read. */
+export function downloadUrl(f: SpFile): string {
+  if (!f.link) return ''
+  try {
+    const u = new URL(f.link)
+    const path = decodeURIComponent(u.pathname)
+    const at = path.toLowerCase().indexOf(`/${SP_ROOT.toLowerCase()}/`)
+    if (at < 0) throw new Error('library not in the link')
+    return `${u.origin}${path.slice(0, at)}/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(path)}`
+  } catch {
+    return `${f.link.split('?')[0]}?download=1`
+  }
+}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import AppButton from './common/AppButton'
-import { DataTable, Modal, RadioField, TextField } from './ui'
+import { DataTable, Modal, RadioField, SelectField, TextField } from './ui'
 import type { Substation } from '../data/mock'
 
 /** "Search Substation": filter by substation name or SCADA name, click a row, then Done. */
@@ -42,36 +42,46 @@ export function SubstationPicker({ substations, onDone, onClose }: { substations
 }
 
 export interface SubstationEntry { substation: Substation; status: string; display: 'true' | 'false'; year: string; remark: string }
+/** What an existing row already holds, to show it (view) or change it (edit). */
+export interface SubstationInitial { substation: Substation; status: string; display: 'true' | 'false'; year: string }
 
-/** Project details › Existing KVSS (or Future substation): Name (picked in the search popup), Status, Display in Smart Office, then Save. */
-export function SubstationEntryModal({ future, substations, taken, saving, onClose, onSave }: {
-  future: boolean; substations: Substation[]; taken: Set<string>; saving?: boolean; onClose: () => void; onSave: (e: SubstationEntry) => void
+/** Project details › Existing KVSS (or Future substation): add, view or edit one row.
+ *  Future substation: Commissioning Year, Substation (picked in the search popup), Status, Is Active ?. Existing KVSS: Name, Status, Display in Smart Office?. */
+export function SubstationEntryModal({ future, mode = 'add', initial, substations, taken, saving, onClose, onSave }: {
+  future: boolean; mode?: 'add' | 'view' | 'edit'; initial?: SubstationInitial; substations: Substation[]; taken: Set<string>; saving?: boolean; onClose: () => void; onSave: (e: SubstationEntry) => void
 }) {
-  const [picking, setPicking] = useState(true) // the search popup opens first
-  const [sub, setSub] = useState<Substation | null>(null)
-  const [display, setDisplay] = useState('')
-  const [year, setYear] = useState('')
-  const [remark, setRemark] = useState('')
+  const view = mode === 'view'
+  const [picking, setPicking] = useState(mode === 'add') // when adding, the search popup opens first
+  const [sub, setSub] = useState<Substation | null>(initial?.substation ?? null)
+  const [display, setDisplay] = useState<string>(initial?.display ?? '')
+  const [year, setYear] = useState(initial?.year ?? '')
+  const [status, setStatus] = useState(initial?.status ?? '') // Future substation: chosen from a list; Existing: the substation's "built by"
   const dup = !!sub && taken.has(sub.id)
+  const yearBad = future && !!year.trim() && !/^(19|20)\d{2}$/.test(year.trim()) // ProjectYear in UC000420_ProjectsFutureYears: a four-digit year
+  const base = future ? 'Project details › Future substation' : 'Project details › Existing KVSS'
   return (
     <>
-      <Modal title={future ? 'Project details › Future substation' : 'Project details › Existing KVSS'} size="md" onClose={onClose} footer={
+      <Modal title={view ? `${base} (view)` : mode === 'edit' ? `${base} (edit)` : base} size="md" onClose={onClose} footer={view ? <AppButton variant="outlined" onClick={onClose}>Close</AppButton> : (
         <>
           <AppButton variant="outlined" disabled={saving} onClick={onClose}>Cancel</AppButton>
-          <AppButton variant="contained" loading={saving} disabled={!sub || !display || dup} onClick={() => sub && onSave({ substation: sub, status: sub.builtBy, display: display as 'true' | 'false', year, remark })}>Save</AppButton>
+          <AppButton variant="contained" loading={saving} disabled={!sub || !display || dup || (future && (!year.trim() || yearBad || !status))} onClick={() => sub && onSave({ substation: sub, status: future ? status : status || sub.builtBy, display: display as 'true' | 'false', year: year.trim(), remark: '' })}>Save</AppButton>
         </>
-      }>
-        <div className="with-action" style={{ alignItems: 'flex-end' }}>
-          <TextField label="Name" required value={sub?.name ?? ''} readOnly placeholder="Choose a substation" />
-          <AppButton variant="contained" startIcon={<Search size={15} />} onClick={() => setPicking(true)}>Substation</AppButton>
+      )}>
+        {future && <TextField label="Commissioning Year" type="number" required={!view} value={year} readOnly={view} onChange={setYear} error={yearBad ? 'Enter a four-digit year, for example 2028' : undefined} />}
+        <div className="field">
+          <label htmlFor="kvss-name">{future ? 'Substation' : 'Name'}{!view && <span className="req" aria-hidden>*</span>}</label>
+          <div className="with-action">
+            <input id="kvss-name" className={`input${dup ? ' invalid' : ''}`} readOnly value={sub?.name ?? ''} placeholder="Choose a substation" aria-invalid={dup} />
+            {!view && <AppButton variant="contained" startIcon={<Search size={15} />} onClick={() => setPicking(true)}>Substation</AppButton>}
+          </div>
         </div>
         {dup && <p className="error-text" role="alert">This substation is already in the list.</p>}
-        <TextField label="Status" value={sub?.builtBy ?? ''} readOnly />
-        {future && <TextField label="Commissioning year" type="number" value={year} onChange={setYear} />}
-        {future && <TextField label="Remark" value={remark} onChange={setRemark} />}
-        <RadioField label="Display in Smart Office?" required options={['true', 'false']} value={display} onChange={setDisplay} />
+        {future
+          ? <SelectField label="Status" required={!view} value={status} options={status && !['DEWA', 'Developer'].includes(status) ? ['DEWA', 'Developer', status] : ['DEWA', 'Developer']} disabled={view} onChange={setStatus} />
+          : <TextField label="Status" value={status} readOnly />}
+        <RadioField label={future ? 'Is Active ?' : 'Display in Smart Office?'} required={!view} options={['true', 'false']} value={display} disabled={view} onChange={setDisplay} />
       </Modal>
-      {picking && <SubstationPicker substations={substations} onDone={(s) => { setSub(s); setPicking(false) }} onClose={() => { setPicking(false); if (!sub) onClose() }} />}
+      {picking && <SubstationPicker substations={substations} onDone={(s) => { setSub(s); setStatus((cur) => (future ? cur || s.builtBy : s.builtBy)); setPicking(false) }} onClose={() => { setPicking(false); if (!sub) onClose() }} />}
     </>
   )
 }

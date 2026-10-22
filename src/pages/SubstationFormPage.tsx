@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
-import Section from '../components/common/Section'
 import PageHeader from '../components/PageHeader'
 import RemoteBadge from '../components/RemoteBadge'
 import { loadSubstation } from '../data/details'
@@ -10,8 +9,10 @@ import { userMessage } from '../data/api'
 import { saveRecord } from '../data/write'
 import { useRemote } from '../data/remote'
 import { syncEntity, useSyncStatus } from '../data/sync'
+import StatusChip from '../components/common/StatusChip'
 import { DataTable, RadioField, SelectField, Tabs, TextField, useToast } from '../components/ui'
-import { useLimits, useSubstations } from '../data/store'
+import { fmtDate } from '../data/mock'
+import { useSubstations } from '../data/store'
 import { useAuth } from '../context/AuthContext'
 
 export default function SubstationFormPage() {
@@ -19,14 +20,12 @@ export default function SubstationFormPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [substations] = useSubstations()
-  const [standardLimits] = useLimits()
   const existing = substations.find((s) => s.id === id)
   const isNew = !existing
   const [name, setName] = useState(existing?.name ?? '')
   const [show, setShow] = useState(existing ? (existing.showInSO ? 'Yes' : 'No') : '')
   const [scada, setScada] = useState(existing?.scada ?? '')
   const [builtBy, setBuiltBy] = useState<string>(existing?.builtBy ?? '')
-  const [limit, setLimit] = useState(existing?.limit ?? '')
   // Opening a substation calls the flow for its details, limits, totals and the projects it serves.
   const live = useSyncStatus().state === 'live'
   const remote = useRemote(existing && live ? existing.id : null, () => loadSubstation(existing!.id))
@@ -34,10 +33,9 @@ export default function SubstationFormPage() {
     const d = remote.data
     if (!d) return
     setName(d.name); setScada(d.scada); if (d.builtBy) setBuiltBy(d.builtBy)
-    const l = d.limits[0]; if (l) setLimit(l.description || l.amount)
   }, [remote.data])
   const detail = remote.data
-  const [tab, setTab] = useState('Substation details')
+  const [tab, setTab] = useState('Substation Details')
   const [submitted, setSubmitted] = useState(false)
   const [toast, say] = useToast()
   const e = (v: string) => (submitted && !v ? 'This field is required' : undefined)
@@ -45,7 +43,7 @@ export default function SubstationFormPage() {
   // Save writes to SQL through the flow (substation.create / substation.update), then reloads the lists.
   const save = async () => {
     setSubmitted(true)
-    if (!name || !show || !scada || !builtBy || (!isNew && !limit)) return
+    if (!name || !show || !scada || !builtBy) return
     if (!live) { say('The server can’t be reached right now: nothing was saved. Please try again.'); return }
     setSaving(true)
     try {
@@ -67,22 +65,34 @@ export default function SubstationFormPage() {
         </>
       } />
       <div className="card" style={{ overflow: 'hidden' }}>
-        <Tabs tabs={isNew ? ['Substation details'] : ['Substation details', 'Limit history', 'Projects']} active={tab} onChange={setTab} />
-        {tab === 'Substation details' ? (
+        <Tabs tabs={isNew ? ['Substation Details'] : ['Substation Details', 'Limit History', 'Projects']} active={tab} onChange={setTab} />
+        {tab === 'Substation Details' ? (
           <div className="card-body" style={{ maxWidth: 820 }}>
-            <Section title="Details">
-              <div className="grid-auto">
-                <TextField label="Substation name" required value={name} error={e(name)} onChange={setName} />
-                <TextField label="Substation SCADA name" required value={scada} error={e(scada)} onChange={setScada} />
-                <SelectField label="Built by" required value={builtBy} options={['DEWA', 'Developer']} error={e(builtBy)} onChange={setBuiltBy} />
-                <RadioField label="Show in Smart Office?" required value={show} error={e(show)} onChange={setShow} />
-                {!isNew && <SelectField label="Limit" required value={limit} options={[...new Set([...(limit ? [limit] : []), ...standardLimits.map((l) => l.amount)])]} error={e(limit)} onChange={setLimit} />}
-              </div>
-            </Section>
+            <TextField label="Substation Name" required value={name} error={e(name)} onChange={setName} />
+            <RadioField label="Show in Smart Office?" required value={show} error={e(show)} onChange={setShow} />
+            <TextField label="Substation SCADA Name" required value={scada} error={e(scada)} onChange={setScada} />
+            <SelectField label="Built By" required value={builtBy} options={['DEWA', 'Developer']} error={e(builtBy)} onChange={setBuiltBy} />
+            {!isNew && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr)', gap: 20 }}>
+                  <TextField label="Limit Amount" value={detail?.limits[0]?.amount ?? ''} readOnly />
+                  <TextField label="Limit Description" value={detail?.limits[0]?.description ?? ''} readOnly />
+                </div>
+                <TextField label="Total Plots" value={detail?.totals.plots != null ? String(detail.totals.plots) : ''} readOnly />
+                <TextField label="Total TCL" value={detail?.totals.tcl != null ? String(detail.totals.tcl) : ''} readOnly />
+                <TextField label="Total DCP" value={detail?.totals.dcp != null ? String(detail.totals.dcp) : ''} readOnly />
+              </>
+            )}
           </div>
-        ) : tab === 'Limit history' ? (
-          <DataTable rows={detail?.limits ?? []} empty="No limits for this substation."
-            columns={[{ header: 'Limit amount', render: (r) => r.amount }, { header: 'Description', render: (r) => r.description }]} />
+        ) : tab === 'Limit History' ? (
+          <DataTable rows={detail?.history.length ? detail.history : (detail?.limits ?? []).map((l) => ({ ...l, createdOn: '', createdBy: '', active: true }))} empty="No limits for this substation."
+            columns={[
+              { header: 'Limit Amount', render: (r) => r.amount },
+              { header: 'Limit Description', render: (r) => r.description },
+              { header: 'Created On', render: (r) => (r.createdOn ? fmtDate(r.createdOn) : '—') },
+              { header: 'Created by', render: (r) => r.createdBy || '—' },
+              { header: 'Show in Smart Office', render: (r) => <StatusChip status={r.active ? 'active' : 'inactive'} label={String(r.active)} /> },
+            ]} />
         ) : (
           <div>
             <div className="card-body"><div className="stats">

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { placeFixed } from './placeFixed'
 import { createPortal } from 'react-dom'
 import { ChevronDown, X } from 'lucide-react'
 
@@ -20,6 +21,12 @@ export default function SearchSelect({ value, onChange, options, placeholder, la
     window.addEventListener('resize', close)
     return () => { document.removeEventListener('mousedown', down); window.removeEventListener('scroll', move, true); window.removeEventListener('resize', close) }
   }, [open])
+  // place the list by its measured position, corrected for the page zoom (see placeFixed)
+  useLayoutEffect(() => {
+    if (!open || !box || !pop.current) return
+    const z = placeFixed(pop.current, box.left, box.top)
+    pop.current.style.width = `${box.width / z}px`
+  }, [open, box])
   const toggle = () => {
     if (open) { close(); return }
     const r = ref.current?.getBoundingClientRect()
