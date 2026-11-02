@@ -1,4 +1,7 @@
 /*
+  SUPERSEDED by sql/fix_sql_injection.sql, which contains the same created_at / created_by fixes AND stops values being pasted into the SQL text.
+  Do not run this script after that one: it would put the old (injectable) versions back.
+
   Fixes the procedures that select ALTERd_at / ALTERd_by: the tables have created_at / created_by,
   so they fail with "Invalid column name 'ALTERd_at'". Only those two column names change; parameters and results are the same.
   Run in SSMS against Microsoft_PP_Projects_Dev. Procedures covered: ViewDevIssues, ViewPlotDetails, ViewProjDetails, ViewProjExistingKVSS, ViewProjFutureYears, ViewProjHistory, ViewProjIssues, ViewProjPPR, ViewSettings_TCL, ViewSubstation_Details, ViewSubstation_Limits, ViewProjRemarks, ViewSubstationLimitDetails

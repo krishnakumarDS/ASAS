@@ -13,7 +13,7 @@ interface Result { name: string; status: Status; ms: number; detail: string; raw
 interface FileItem { type: 'folder' | 'file'; name: string; folder: string; modified: string; by: string; link: string; id: string; identifier: string; driveItemId: string }
 /** A step returns a one-line detail, or the detail plus the full response to show underneath. */
 type Out = string | { detail: string; raw: string; files?: FileItem[] }
-type Suite = 'read' | 'crud' | 'upload' | 'list' | 'status'
+type Suite = 'read' | 'crud' | 'upload' | 'list' | 'status' | 'inject'
 
 /** Runs one step and records how long it took; a thrown error becomes a failed row. */
 async function step(name: string, fn: () => Promise<Out>, expectError = false): Promise<Result> {
@@ -39,7 +39,7 @@ export default function FlowSuite() {
   const { user } = useAuth()
   const me = user?.email || 'flow-test'
   const [running, setRunning] = useState<Suite | null>(null)
-  const [results, setResults] = useState<Record<Suite, Result[]>>({ read: [], crud: [], upload: [], list: [], status: [] })
+  const [results, setResults] = useState<Record<Suite, Result[]>>({ read: [], crud: [], upload: [], list: [], status: [], inject: [] })
   const [file, setFile] = useState<File | null>(null)
 
   const push = (suite: Suite, r: Result) => setResults((p) => ({ ...p, [suite]: [...p[suite], r] }))
@@ -138,6 +138,31 @@ export default function FlowSuite() {
     setRunning(null)
   }
 
+  /** 6. SQL injection check (read-only): text that tries to break out of a query must be treated as plain text, so it matches nothing. A real name with an apostrophe must still work. */
+  const runInject = async () => {
+    begin('inject')
+    const evil = "zzqq' OR 1=1 --"
+    const count = async (action: string, params: Record<string, unknown>) => Number((await callApi(action, params))[0]?.[0]?.TotalCount ?? 0)
+    push('inject', await step('SearchProjects_Count with projectName = ' + evil, async () => {
+      const n = await count('SearchProjects_Count', { projectName: evil })
+      if (n !== 0) throw new Error(`Returned ${n} rows: the text was run as SQL. Run sql/fix_sql_injection.sql.`)
+      return '0 rows: treated as text'
+    }))
+    push('inject', await step('SearchPlots_Count with devPlotNum = ' + evil, async () => {
+      const n = await count('SearchPlots_Count', { devPlotNum: evil })
+      if (n !== 0) throw new Error(`Returned ${n} rows: the text was run as SQL. Run sql/fix_sql_injection.sql.`)
+      return '0 rows: treated as text'
+    }))
+    push('inject', await step("ViewProjDetails with maalemDubaiRef = x' OR 1=1 --", async () => {
+      const sets = await callApi('ViewProjDetails', { maalemDubaiRef: "x' OR 1=1 --" })
+      const n = sets[0]?.length ?? 0
+      if (n !== 0) throw new Error(`Returned ${n} project rows: the text was run as SQL. Run sql/fix_sql_injection.sql.`)
+      return '0 rows: treated as text'
+    }))
+    push('inject', await step("A name with an apostrophe (O'Brien) still searches without an error", async () => `${await count('SearchProjects_Count', { projectName: "O'Brien" })} rows`))
+    setRunning(null)
+  }
+
   const summary = (rs: Result[]) => {
     const ok = rs.filter((r) => r.status === 'ok').length, bad = rs.filter((r) => r.status === 'fail').length
     return rs.length ? <span className={`badge ${bad ? 'badge-danger' : 'badge-success'}`}>{ok} passed{bad ? ` · ${bad} failed` : ''}</span> : null
@@ -196,6 +221,7 @@ export default function FlowSuite() {
         <FileDrop label="Optional file" file={file} onFile={setFile} hint="Leave empty to upload a generated text file." />)}
       {block('list', '4 · ASAS_GetFiles: list SharePoint files', 'Lists what the flow returns (the whole library, with paths) so you can see the upload from test 3. Thumbnails and user details are trimmed.', runList)}
       {block('status', '5 · ASAS_File_Activations: file Active / Inactive', 'Sets the Status column of the newest file in _flow-test to Active, then Inactive, and reads it back to confirm. Run test 3 first.', runStatus)}
+      {block('inject', '6 · SQL injection check (read-only)', "Sends text such as zzqq' OR 1=1 -- to three searches. It must match nothing. Fails until sql/fix_sql_injection.sql has been run in the database.", runInject)}
     </section>
   )
 }

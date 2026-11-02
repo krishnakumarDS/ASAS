@@ -7,6 +7,7 @@
   Writes:  an action with a dot, <entity>.<operation> (developer.create, plot.update, project.setActive, substation.delete,
            consultant.get, developer.list ...), is passed to sp_UC000420_Crud. Deploy sp_UC000420_Crud first.
   Not exposed: plot write procedures, *_Test, *_IGNORE, ViewPlotDetails_SO and ViewSubstationDetails_SO (do not compile as written).
+  Security: the Search* / View* procedures must be the versions from sql/fix_sql_injection.sql (values passed as parameters, not pasted into SQL text).
   Known source bugs still apply: ViewConsProjects / ViewDevProjects ignore their ID; check ALTERd_at column names in the live DB.
 */
 USE [Microsoft_PP_Projects_Dev]
@@ -49,7 +50,8 @@ BEGIN
   IF @pageNumber < 1 THROW 50007, 'pageNumber must be 1 or more', 1;
 
   -- JSON values as variables (T-SQL does not allow function calls as EXEC arguments).
-  DECLARE @j_ALTERdBy nvarchar(2000) = JSON_VALUE(@json,'$.alteRdBy');
+  -- ViewDevIssues takes this filter as @ALTERdBy (a leftover typo of the parameter name): the JSON key is createdBy like everywhere else; the old alteRdBy is still accepted
+  DECLARE @j_ALTERdBy nvarchar(2000) = COALESCE(JSON_VALUE(@json,'$.createdBy'), JSON_VALUE(@json,'$.alteRdBy'));
   DECLARE @j_BuiltBy nvarchar(2000) = JSON_VALUE(@json,'$.builtBy');
   DECLARE @j_ConsultantID_i int = TRY_CAST(JSON_VALUE(@json,'$.consultantID') AS int);
   DECLARE @j_ConsultantName nvarchar(2000) = JSON_VALUE(@json,'$.consultantName');
