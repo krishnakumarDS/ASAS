@@ -6,7 +6,7 @@ const names: Record<string, string> = { projects: 'Projects', substations: 'Subs
 export default function Breadcrumb() {
   const parts = useLocation().pathname.split('/').filter(Boolean)
   if (!parts.length) return null
-  const crumbs = parts.map((p, i) => ({ label: names[p] ?? (/^\d+$/.test(p) ? 'Details' : decodeURIComponent(p)), to: '/' + parts.slice(0, i + 1).join('/') }))
+  const crumbs = parts.map((p, i) => ({ label: names[p] ?? (/^\d+$/.test(p) ? 'Details' : decodeURIComponent(p)), to: '/' + parts.slice(0, i + 1).join('/') + (p === 'files' ? '/Area%20Map' : '') })) // /projects/<id>/files has no page of its own: the Files crumb opens the first tab
   return (
     <nav aria-label="Breadcrumb" className="row" style={{ gap: 4, fontSize: 12, marginBottom: 6, flexWrap: 'wrap' }}>
       <Link to="/" className="muted">Dashboard</Link>

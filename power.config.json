@@ -1,68 +1,16 @@
 {
   "appDisplayName": "ASAS Portal",
   "description": "ASAS Search Engine Portal — major project data, plots, substations, developers and consultants.",
-  "environmentId": "b0b6bb24-fa49-ed86-80a8-a7c7d36ea051",
+  "environmentId": "4d29b618-02a6-e0a0-a6ea-6596db47e641",
   "buildPath": "./dist",
   "buildEntryPoint": "index.html",
   "logoPath": "Default",
   "localAppUrl": "http://localhost:3000/",
   "region": "prod",
   "connectionReferences": {
-    "118b7515-fc98-492e-913c-642b16f71d69": {
-      "id": "/providers/microsoft.powerapps/apis/shared_sql",
-      "displayName": "SQL Server",
-      "authenticationType": "windowsAuthentication",
-      "sharedConnectionId": "/providers/Microsoft.PowerApps/apis/shared_sql/connections/shared-sql-7d34aeaf-e018-4ad3-9a4a-794011455426",
-      "xrmConnectionReferenceLogicalName": "new_sharedsql_050fe"
-    },
-    "829e2aba-4d56-454f-9506-5ea18a30bcab": {
-      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
-      "displayName": "Logic flows",
-      "dataSources": [
-        "retrieve_sql_data"
-      ],
-      "workflowDetails": {
-        "workflowEntityId": "8523f72d-53c8-f111-a05a-70a8a5200365",
-        "workflowDisplayName": "Retrieve_SQL_Data",
-        "workflowName": "9fe3287e-e442-5420-a534-40fbe4655751",
-        "dependencies": {
-          "shared_sql": "118b7515-fc98-492e-913c-642b16f71d69"
-        }
-      }
-    },
     "e3e432fb-cc90-4bb6-a17d-01475cd4c156": {
       "id": "/providers/microsoft.powerapps/apis/shared_sharepointonline",
       "displayName": "SharePoint"
-    },
-    "854d5b02-8696-4a9a-aef1-0de8fae24a20": {
-      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
-      "displayName": "Logic flows",
-      "dataSources": [
-        "asas_file_storage"
-      ],
-      "workflowDetails": {
-        "workflowEntityId": "56837aea-56cc-f111-a05c-0022480d5aed",
-        "workflowDisplayName": "Asas_file_Storage",
-        "workflowName": "3c431355-629f-5c48-e580-01d2a899f3ab",
-        "dependencies": {
-          "shared_sharepointonline": "e3e432fb-cc90-4bb6-a17d-01475cd4c156"
-        }
-      }
-    },
-    "8faee536-b2a5-461a-bfb5-a3a554112743": {
-      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
-      "displayName": "Logic flows",
-      "dataSources": [
-        "asas_getfiles"
-      ],
-      "workflowDetails": {
-        "workflowEntityId": "00022a3b-f25c-335c-d33a-2b2476a46557",
-        "workflowDisplayName": "ASAS_GetFiles",
-        "workflowName": "39d44e05-18db-c341-794d-f9c5767eb5a5",
-        "dependencies": {
-          "shared_sharepointonline": "e3e432fb-cc90-4bb6-a17d-01475cd4c156"
-        }
-      }
     },
     "aff38642-e3ae-4c1d-b7de-2e724e927a41": {
       "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
@@ -78,9 +26,98 @@
           "shared_sharepointonline": "e3e432fb-cc90-4bb6-a17d-01475cd4c156"
         }
       }
+    },
+    "a02765fd-9cd7-4194-90f0-bd0daa3581ee": {
+      "id": "/providers/microsoft.powerapps/apis/shared_sql",
+      "displayName": "SQL Server",
+      "authenticationType": "windowsAuthentication",
+      "sharedConnectionId": "/providers/Microsoft.PowerApps/apis/shared_sql/connections/55253fe23a92489489bc395d0d0a03ac",
+      "xrmConnectionReferenceLogicalName": "new_sharedsql_050fe"
+    },
+    "1a50bea4-3da7-46da-ad90-f9e35fba5595": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "retrieve_sql_data_projects"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "8523f72d-53c8-f111-a05a-70a8a5200365",
+        "workflowDisplayName": "Retrieve_SQL_Data_Projects",
+        "workflowName": "07486b47-135e-9ac4-3e9f-16c208ec7d09",
+        "dependencies": {
+          "shared_sql": "a02765fd-9cd7-4194-90f0-bd0daa3581ee"
+        }
+      }
+    },
+    "564be630-8d37-4648-b353-cd708063fd7e": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "asas_file_storage"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "56837aea-56cc-f111-a05c-0022480d5aed",
+        "workflowDisplayName": "Asas_file_Storage",
+        "workflowName": "62a629d2-8c86-e196-70d0-906ba4f970f7",
+        "dependencies": {
+          "shared_sharepointonline": "e3e432fb-cc90-4bb6-a17d-01475cd4c156"
+        }
+      }
+    },
+    "2188fa24-2a85-4ca5-b7d8-a56174918cad": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "asas_getfiles"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "00022a3b-f25c-335c-d33a-2b2476a46557",
+        "workflowDisplayName": "ASAS_GetFiles",
+        "workflowName": "91906eab-aa72-8e67-bbb4-362c595f47a8",
+        "dependencies": {
+          "shared_sharepointonline": "e3e432fb-cc90-4bb6-a17d-01475cd4c156"
+        }
+      }
+    },
+    "fae6be08-6ea1-44fc-a6d4-2c7a18f8d282": {
+      "id": "/providers/microsoft.powerapps/apis/shared_azureblob",
+      "displayName": "Azure Blob Storage",
+      "authenticationType": "keyBasedAuth",
+      "sharedConnectionId": "/providers/Microsoft.PowerApps/apis/shared_azureblob/connections/shared-azureblob-6553b7fc-87fc-41dc-bd95-a6c90212642f",
+      "xrmConnectionReferenceLogicalName": "new_sharedazureblob_06ac3"
+    },
+    "08d6d046-4050-4e17-b805-d194800cc0de": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "get_file"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "4065ddcd-9eee-e62d-750c-6476073f18f1",
+        "workflowDisplayName": "Get_File",
+        "workflowName": "2e721d98-2fe8-e35e-9853-7d4a25a231de",
+        "dependencies": {
+          "shared_azureblob": "fae6be08-6ea1-44fc-a6d4-2c7a18f8d282"
+        }
+      }
+    },
+    "7e6cb632-833f-4adc-91ce-9f26af67788d": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "file_blob"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "51656a5c-c0dd-f111-84ea-7ced8dacd093",
+        "workflowDisplayName": "file_Blob",
+        "workflowName": "1c454496-ed67-78f2-047c-5a36d1c603ee",
+        "dependencies": {
+          "shared_azureblob": "fae6be08-6ea1-44fc-a6d4-2c7a18f8d282"
+        }
+      }
     }
   },
   "databaseReferences": {},
   "version": "1.0",
-  "appId": "df13c244-2811-404e-b975-b8f2f29e538e"
+  "appId": "2880716f-b5d9-4c35-a0b2-6adf9f307cd8"
 }

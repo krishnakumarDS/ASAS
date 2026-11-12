@@ -1,14 +1,14 @@
 {
-  "name": "Retrieve_SQL_Data",
+  "name": "Retrieve_SQL_Data_Projects",
   "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
   "type": "Microsoft.PowerApps/apis",
   "properties": {
-    "displayName": "Retrieve_SQL_Data",
+    "displayName": "Retrieve_SQL_Data_Projects",
     "isCustom": false,
     "swagger": {
       "swagger": "2.0",
       "info": {
-        "title": "Retrieve_SQL_Data",
+        "title": "Retrieve_SQL_Data_Projects",
         "version": "2015-02-01-preview"
       },
       "host": "uae-001.azure-apihub.net",

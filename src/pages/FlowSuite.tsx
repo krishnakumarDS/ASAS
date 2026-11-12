@@ -4,7 +4,7 @@ import AppButton from '../components/common/AppButton'
 import { FileDrop } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { callApi } from '../data/api'
-import { listFiles, setFileStatus, uploadFile } from '../data/files'
+import { getBlob, listBlobs, listFiles, setFileStatus, uploadFile, uploadFileToSharePoint } from '../data/files'
 import { toSpFile } from '../data/spFiles'
 import { ACTIONS, SAMPLES } from './flowActions'
 
@@ -13,7 +13,7 @@ interface Result { name: string; status: Status; ms: number; detail: string; raw
 interface FileItem { type: 'folder' | 'file'; name: string; folder: string; modified: string; by: string; link: string; id: string; identifier: string; driveItemId: string }
 /** A step returns a one-line detail, or the detail plus the full response to show underneath. */
 type Out = string | { detail: string; raw: string; files?: FileItem[] }
-type Suite = 'read' | 'crud' | 'upload' | 'list' | 'status' | 'inject'
+type Suite = 'read' | 'crud' | 'upload' | 'list' | 'status' | 'inject' | 'blob' | 'blobRead'
 
 /** Runs one step and records how long it took; a thrown error becomes a failed row. */
 async function step(name: string, fn: () => Promise<Out>, expectError = false): Promise<Result> {
@@ -39,7 +39,7 @@ export default function FlowSuite() {
   const { user } = useAuth()
   const me = user?.email || 'flow-test'
   const [running, setRunning] = useState<Suite | null>(null)
-  const [results, setResults] = useState<Record<Suite, Result[]>>({ read: [], crud: [], upload: [], list: [], status: [], inject: [] })
+  const [results, setResults] = useState<Record<Suite, Result[]>>({ read: [], crud: [], upload: [], list: [], status: [], inject: [], blob: [], blobRead: [] })
   const [file, setFile] = useState<File | null>(null)
 
   const push = (suite: Suite, r: Result) => setResults((p) => ({ ...p, [suite]: [...p[suite], r] }))
@@ -93,7 +93,7 @@ export default function FlowSuite() {
   const runUpload = async () => {
     begin('upload')
     const f = file ?? new File([`ASAS flow test\n${new Date().toISOString()}\nuser: ${me}\n`], `flow-test-${Date.now()}.txt`, { type: 'text/plain' })
-    push('upload', await step(`Upload ${f.name}`, async () => { await uploadFile('_flow-test', f); return `${f.size} bytes sent to _flow-test/${f.name}` }))
+    push('upload', await step(`Upload ${f.name}`, async () => { await uploadFileToSharePoint('_flow-test', f); return `${f.size} bytes sent to _flow-test/${f.name}` }))
     setRunning(null)
   }
 
@@ -163,6 +163,30 @@ export default function FlowSuite() {
     setRunning(null)
   }
 
+  /** 7. file_Blob (Azure Blob Storage): Action "Upload" with the chosen file (or a small generated .txt) into the "_flow-test" blob folder. The flow has no response yet: success = the flow accepted the call. */
+  const runBlob = async () => {
+    begin('blob')
+    const f = file ?? new File([`ASAS blob test\n${new Date().toISOString()}\nuser: ${me}\n`], `blob-test-${Date.now()}.txt`, { type: 'text/plain' })
+    push('blob', await step(`Upload ${f.name} to Azure Blob`, async () => { await uploadFile('_flow-test', f); return `${f.size} bytes sent to _flow-test/${f.name}: check the container in Azure for the blob (the flow does not answer yet)` }))
+    setRunning(null)
+  }
+
+  /** 8. file_Blob Action "List" on the _flow-test folder, then the Get_File flow on the first blob. */
+  const runBlobRead = async () => {
+    begin('blobRead')
+    let first = ''
+    const listed = await step('List _flow-test (file_Blob, Action "List")', async () => {
+      const items = await listBlobs('_flow-test')
+      first = items[0]?.path ?? ''
+      return { detail: `${items.length} blob${items.length === 1 ? '' : 's'}${items.length ? ': ' + items.map((b) => b.name).slice(0, 6).join(', ') : ''}`, raw: JSON.stringify(items, null, 2) }
+    })
+    push('blobRead', listed)
+    if (listed.status === 'ok' && first) {
+      push('blobRead', await step(`Download ${first} (Get_File)`, async () => { const b = await getBlob(first); return `${b.size} bytes, type ${b.type || 'unknown'}` }))
+    } else if (listed.status === 'ok') push('blobRead', { name: 'Get the first blob', status: 'skip', ms: 0, detail: 'No blob in _flow-test: run test 7 first.' })
+    setRunning(null)
+  }
+
   const summary = (rs: Result[]) => {
     const ok = rs.filter((r) => r.status === 'ok').length, bad = rs.filter((r) => r.status === 'fail').length
     return rs.length ? <span className={`badge ${bad ? 'badge-danger' : 'badge-success'}`}>{ok} passed{bad ? ` · ${bad} failed` : ''}</span> : null
@@ -217,11 +241,13 @@ export default function FlowSuite() {
       <div className="section-title">Test all flows</div>
       {block('read', '1 · Retrieve_SQL_Data: read actions', `Runs all ${ACTIONS.length} Search*/View* actions with their sample JSON. Placeholder ids may return 0 rows; only errors fail. "Nope" must fail.`, runRead)}
       {block('crud', '2 · Retrieve_SQL_Data: create / update / delete', 'Creates a developer named "ZZ Flow Test …" and walks it through get, update, hide, show and delete. Writes real rows: the test row stays in the table, hidden.', runCrud)}
-      {block('upload', '3 · Asas_file_Storage: SharePoint upload', 'Sends a file to the _flow-test folder. With no file chosen, a small generated .txt is used.', runUpload,
+      {block('upload', '3 · Asas_file_Storage: SharePoint upload (previous upload)', 'Sends a file to the _flow-test folder. With no file chosen, a small generated .txt is used.', runUpload,
         <FileDrop label="Optional file" file={file} onFile={setFile} hint="Leave empty to upload a generated text file." />)}
       {block('list', '4 · ASAS_GetFiles: list SharePoint files', 'Lists what the flow returns (the whole library, with paths) so you can see the upload from test 3. Thumbnails and user details are trimmed.', runList)}
       {block('status', '5 · ASAS_File_Activations: file Active / Inactive', 'Sets the Status column of the newest file in _flow-test to Active, then Inactive, and reads it back to confirm. Run test 3 first.', runStatus)}
       {block('inject', '6 · SQL injection check (read-only)', "Sends text such as zzqq' OR 1=1 -- to three searches. It must match nothing. Fails until sql/fix_sql_injection.sql has been run in the database.", runInject)}
+      {block('blob', '7 · file_Blob: Azure Blob upload', 'Sends a file to the _flow-test folder of the blob container with Action "Upload". The flow gives no answer yet, so check the container to confirm.', runBlob)}
+      {block('blobRead', '8 · file_Blob list + Get_File download', 'Lists the _flow-test blob folder (file_Blob, Action "List"), then downloads the first blob through the Get_File flow.', runBlobRead)}
     </section>
   )
 }

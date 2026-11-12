@@ -1,19 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AlertCircle, ArrowLeft, ClipboardList, Download, FileImage, FileText, History, Layers, Map as MapIcon, Plus, Presentation, RefreshCw, Search, Upload } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import AppButton from '../components/common/AppButton'
-import EmptyState from '../components/common/EmptyState'
 import StatusChip from '../components/common/StatusChip'
 import PageHeader from '../components/PageHeader'
 import IconButton from '../components/common/IconButton'
 import { ActionsMenu, DataTable, FileDrop, Modal, SelectField, TextField, useToast } from '../components/ui'
 import { fmtDate } from '../data/mock'
-import { uploadFile } from '../data/files'
-import { downloadUrl, filesIn, setFileActive, splitTab, syncFiles, useFilesStatus, useSpFiles } from '../data/spFiles'
-import type { SpFile } from '../data/spFiles'
+import { downloadBlob, listBlobs, uploadFile } from '../data/files'
+import type { BlobItem } from '../data/files'
 import { errorDetail, userMessage } from '../data/api'
-import { getStored, newId, usePersistent, useProjects, useSubstations } from '../data/store'
+import { newId, usePersistent, useProjects, useSubstations } from '../data/store'
 import { useAuth } from '../context/AuthContext'
 
 const TABS: { name: string; icon: LucideIcon }[] = [
@@ -23,9 +21,6 @@ const TABS: { name: string; icon: LucideIcon }[] = [
 const NO_PPR: PprRow[] = []
 const NO_ISSUES: IssueRow[] = []
 const NO_HISTORY: HistoryRow[] = []
-/** Downloads the file: its SharePoint address with ?download=1 opens in a new tab and the browser saves it. */
-const download = (f: SpFile) => { const u = downloadUrl(f); if (u) window.open(u, '_blank', 'noopener') }
-const isFileTabName = (t: string) => !['Issues', 'History', 'PPR'].includes(t)
 const ACCEPT_HINT = 'Accepted: DOC, DOCX, XLSX, XLS, JPG, PNG, JPEG and PDF.'
 
 interface IssueRow { id: string; description: string; fileName: string; createdBy: string; createdOn: string; active: boolean }
@@ -56,18 +51,23 @@ export default function ProjectFilesPage() {
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const seededFiles = /^\d+$/.test(id)
-  const sp = useSpFiles()
-  const spStatus = useFilesStatus()
-  // The files of a tab come from SharePoint (<project ref>/<tab>): the newest is the active one, older ones are in-active.
-  const tabFiles = useMemo(() => filesIn(sp.items, project?.maalemRef ?? id, tab), [sp.items, project?.maalemRef, id, tab])
-  const { active: activeFiles, inactive: inactiveFiles } = useMemo(() => splitTab(tabFiles), [tabFiles])
-  const [switching, setSwitching] = useState(false)
-  // Active / in-active is the Status column of the file in SharePoint (ASAS_File_Activations flow). Any number of files can be active; each is switched on its own.
-  const activate = async (target: SpFile, active: boolean) => {
-    setSwitching(true)
-    try { await setFileActive(project?.maalemRef ?? id, tab, target, active); say(active ? 'File is now active' : 'File set to in-active') }
-    catch (e) { console.error(e); say(`The file status could not be changed: ${errorDetail(e)}`) }
-    setSwitching(false)
+  // Files kept in Azure Blob Storage (file_Blob flow): listed for the open tab, downloaded on request
+  const isFileTabNow = !['Issues', 'History', 'PPR'].includes(tab)
+  const blobFolder = `${project?.maalemRef ?? id}/${tab}`
+  const [blobs, setBlobs] = useState<BlobItem[]>([])
+  const [blobState, setBlobState] = useState<{ loading: boolean; error: string; loaded: boolean }>({ loading: false, error: '', loaded: false })
+  const [downloading, setDownloading] = useState<string | null>(null)
+  const loadBlobs = useCallback(async () => {
+    setBlobState((s) => ({ ...s, loading: true, error: '' }))
+    try { setBlobs(await listBlobs(blobFolder)); setBlobState({ loading: false, error: '', loaded: true }) }
+    // A tab nobody has uploaded to has no folder in the container yet, and the flow fails on it (502): show an empty list, not an error. The reason stays in the console.
+    catch (e) { console.warn('Blob list failed (treated as no files):', errorDetail(e)); setBlobs([]); setBlobState({ loading: false, error: '', loaded: true }) }
+  }, [blobFolder])
+  useEffect(() => { if (isFileTabNow) void loadBlobs() }, [loadBlobs, isFileTabNow])
+  const getBlobFile = async (b: BlobItem) => {
+    setDownloading(b.id)
+    try { await downloadBlob(b.path, b.name) } catch (e) { say(`The file could not be downloaded: ${errorDetail(e)}`) }
+    setDownloading(null)
   }
   const [issues, setIssues] = usePersistent<IssueRow[]>(`project:${id}:issues`, NO_ISSUES)
   const [history, setHistory] = usePersistent<HistoryRow[]>(`project:${id}:history`, NO_HISTORY)
@@ -83,20 +83,23 @@ export default function ProjectFilesPage() {
   const now = () => new Date().toISOString()
   const uid = newId
   const submit = async () => {
-    // the file goes to SharePoint first (folder = "<project ref.>/<tab>", e.g. MP-00000-114/Area Map; the file keeps its own name); the lists are only updated once it is stored
+    // the file goes to Azure Blob Storage first (folder = "<project ref.>/<tab>", e.g. MP-00000-114/Area Map; the file keeps its own name); the lists are only updated once it is sent
+    // The file lists and the Active / In-active status still read SharePoint (ASAS_GetFiles / ASAS_File_Activations), so a blob upload does not appear in them yet.
     if (file) {
       setUploading(true)
-      try { await uploadFile(`${project?.maalemRef ?? id}/${tab}`, file) }
+      try {
+        const path = await uploadFile(`${project?.maalemRef ?? id}/${tab}`, file)
+        // keep the returned path so the file can be fetched with it right away (Get_File takes this path)
+        setBlobs((b) => (b.some((x) => x.path === path) ? b : [...b, { id: path, name: file.name, path, size: file.size, modified: new Date().toISOString(), isFolder: false }]))
+      }
       catch (e) { say(userMessage(e, 'The file could not be uploaded. Please try again.')); setUploading(false); return }
-      await syncFiles() // the new file is read back from SharePoint
-      const newest = filesIn(getStored<{ items: SpFile[] }>('spFiles', { items: [] }).items, project?.maalemRef ?? id, tab)[0]
-      if (newest && isFileTabName(tab)) { try { await setFileActive(project?.maalemRef ?? id, tab, newest, true) } catch (e) { say(`The file was uploaded, but it could not be made active: ${errorDetail(e)}`) } }
       setUploading(false)
+      setTimeout(() => { void loadBlobs() }, 2500) // give the flow a moment to store the blob, then list again
     }
     if (tab === 'Issues') setIssues((p) => [...p, { id: uid(), description: desc, fileName: file?.name ?? '', createdBy: ME, createdOn: now(), active: true }])
     else if (tab === 'History') setHistory((p) => [...p, { id: uid(), date: hDate, ptpReceived: ptp, mpRef: mp, createdBy: ME, createdOn: now(), active: true, reply: file?.name ?? '' }])
     else if (tab === 'PPR') setPpr((p) => [...p, { id: uid(), substation, createdBy: ME, createdOn: now(), updatedBy: ME, updatedOn: now(), active: true, fileName: file?.name ?? '' }])
-    say('Uploaded successfully'); close()
+    say(file && isFileTab ? 'Sent to Azure Blob Storage' : 'Uploaded successfully'); close()
   }
   const canSubmit = tab === 'Issues' ? !!desc.trim() : tab === 'History' ? !!hDate : tab === 'PPR' ? !!substation : !!file
   const match = (s: string) => s.toLowerCase().includes(q.toLowerCase())
@@ -117,38 +120,24 @@ export default function ProjectFilesPage() {
           {isFileTab && (
             <>
               <section className="card pad">
-                <div className="row between wrap" style={{ gap: 12, marginBottom: 14 }}>
-                  <div><h4>{tab}</h4><p className="muted" style={{ fontSize: 13 }}>Active files in Smart Office</p></div>
-                  <div className="row wrap">
-                    <AppButton variant="outlined" startIcon={<RefreshCw size={15} />} loading={spStatus === 'loading'} onClick={() => { void syncFiles().then((ok) => say(ok ? 'Refreshed' : 'The file list could not be loaded. Please try again.')) }}>Refresh</AppButton>
-                    <AppButton variant="contained" startIcon={<Upload size={15} />} onClick={() => setModal(true)}>Upload new file</AppButton>
-                  </div>
+                <div className="row between wrap" style={{ gap: 12 }}>
+                  <div><h4>{tab}</h4><p className="muted" style={{ fontSize: 13 }}>Files stored in Azure Blob Storage</p></div>
+                  <AppButton variant="contained" startIcon={<Upload size={15} />} onClick={() => setModal(true)}>Upload new file</AppButton>
                 </div>
-                {activeFiles.length > 0 ? (
-                  <div className="stack" style={{ gap: 8 }}>
-                    {activeFiles.map((f) => (
-                      <div key={f.id} className="row" style={{ gap: 12, padding: '14px 16px', background: 'var(--accent-50)', border: '1px solid var(--accent-100)', borderRadius: 'var(--radius-md)', color: 'var(--accent-600)', fontWeight: 600 }}>
-                        <FileText size={18} /><a href={f.link} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>{f.name}</a>
-                        <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>{f.by} · {fmtDate(f.modified)}</span>
-                        <span className="badge badge-success" style={{ marginLeft: 'auto' }}>Active</span>
-                        <IconButton small title="Download" aria-label={`Download ${f.name}`} onClick={() => download(f)}><Download size={17} /></IconButton>
-                        <AppButton variant="outlined" size="small" disabled={switching} onClick={() => { void activate(f, false) }}>Make in-active</AppButton>
-                      </div>
-                    ))}
-                  </div>
-                ) : spStatus === 'loading' && !sp.at ? <p className="row" style={{ gap: 8 }}><span className="spinner" /> Loading files…</p>
-                  : <EmptyState compact title="No active file" description="Upload a file, or make one of the in-active files active." />}
               </section>
               <section className="card">
-                <div className="card-head"><h4>In-active files</h4></div>
-                <SearchRow q={q} setQ={setQ} placeholder="Search by file name…" />
-                <DataTable<SpFile>
-                  rows={inactiveFiles.filter((r) => match(r.name))} empty="No in-active files."
+                <div className="card-head">
+                  <div><h4>Files in Azure Blob Storage</h4><p className="muted" style={{ fontSize: 13 }}>{blobFolder}</p></div>
+                  <AppButton variant="outlined" size="small" startIcon={<RefreshCw size={15} />} loading={blobState.loading} onClick={() => { void loadBlobs() }}>Refresh</AppButton>
+                </div>
+                {blobState.error && <p className="error-text" role="alert" style={{ padding: '0 20px 12px' }}>{blobState.error}</p>}
+                <DataTable<BlobItem>
+                  rows={blobs} empty={blobState.loading ? 'Loading…' : 'No files uploaded for this tab yet.'}
                   columns={[
-                    { header: 'File name', render: (r) => <a href={r.link} target="_blank" rel="noreferrer"><strong>{r.name}</strong></a> },
-                    { header: 'Uploaded', render: (r) => <><div>{r.by}</div><div className="cell-sub">{fmtDate(r.modified)}</div></> },
-                    { header: 'Active', render: () => <StatusChip status="inactive" label="false" /> },
-                    { header: '', align: 'right', render: (r) => <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}><IconButton small title="Download" aria-label={`Download ${r.name}`} onClick={() => download(r)}><Download size={17} /></IconButton><AppButton variant="outlined" size="small" disabled={switching} onClick={() => { void activate(r, true) }}>Make active</AppButton></div> },
+                    { header: 'File name', render: (r) => <strong>{r.name}</strong> },
+                    { header: 'Size', render: (r) => (r.size ? `${Math.max(1, Math.round(r.size / 1024)).toLocaleString('en')} KB` : '—') },
+                    { header: 'Modified', render: (r) => (r.modified ? fmtDate(r.modified) : '—') },
+                    { header: '', align: 'right', render: (r) => <IconButton small title="Download" aria-label={`Download ${r.name}`} disabled={downloading === r.id} onClick={() => { void getBlobFile(r) }}><Download size={17} /></IconButton> },
                   ]}
                 />
               </section>

@@ -4,7 +4,7 @@ import AppButton from '../components/common/AppButton'
 import PageHeader from '../components/PageHeader'
 import { TextField } from '../components/ui'
 import { ACTIONS, CRUD_ENTITY_NAMES, CRUD_OPS, crudSample, sampleJson } from './flowActions'
-import { Retrieve_SQL_DataService } from '../generated'
+import { Retrieve_SQL_Data_ProjectsService } from '../generated'
 import FlowSuite from './FlowSuite'
 
 type Row = Record<string, unknown>
@@ -35,7 +35,7 @@ export default function FlowTestPage() {
     const t0 = performance.now()
     try {
       // The generated service names the flow's two inputs text (Action) and text_1 (Inputs, the JSON).
-      const r = await Retrieve_SQL_DataService.Run({ text: action, text_1: json })
+      const r = await Retrieve_SQL_Data_ProjectsService.Run({ text: action, text_1: json })
       const ms = Math.round(performance.now() - t0)
       const raw = r.data?.output ?? ''
       if (!r.success) setRun({ ms, ok: false, raw, tables: [], error: r.error?.message ?? 'The flow call failed.' })

@@ -10,7 +10,6 @@ import { clearStored, refreshStored, snapshot } from '../../data/store'
 import { markLeft } from '../../data/session'
 import { useApiBusy } from '../../data/api'
 import { startSync, syncFromDatabase, useDataReady, useSyncStatus } from '../../data/sync'
-import { syncFiles } from '../../data/spFiles'
 import { PageLoader, Spinner } from '../Loader'
 import { useTheme } from '../../context/ThemeContext'
 import ConfirmationDialog from '../common/ConfirmationDialog'
@@ -52,7 +51,6 @@ export default function AppLayout() {
     setSpin(true)
     refreshStored()
     void syncFromDatabase(true) // Refresh: load all the lists again
-    void syncFiles()
     setRefreshKey((k) => k + 1)
     setTimeout(() => setSpin(false), 700)
   }
@@ -61,8 +59,6 @@ export default function AppLayout() {
   useEffect(() => setOpen(false), [pathname])
   // Opening the app: use the lists stored in this browser; only the first visit (or a Reset) loads them from the server.
   useEffect(() => { if (user) void startSync(user.id) }, [user])
-  // The SharePoint file list is read on every open (one flow call) and kept in the store for the project Files screens.
-  useEffect(() => { if (user) void syncFiles() }, [user])
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 961px)')
     const h = () => setDesktop(mq.matches)

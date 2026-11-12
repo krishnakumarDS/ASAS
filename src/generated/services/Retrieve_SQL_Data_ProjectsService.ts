@@ -4,23 +4,23 @@
  */
 
 import type { IOperationResult } from '@microsoft/power-apps/data';
-import type { ManualTriggerInput } from '../models/Retrieve_SQL_DataModel';
-import type { ResponseActionOutput } from '../models/Retrieve_SQL_DataModel';
+import type { ManualTriggerInput } from '../models/Retrieve_SQL_Data_ProjectsModel';
+import type { ResponseActionOutput } from '../models/Retrieve_SQL_Data_ProjectsModel';
 import { dataSourcesInfo } from '../../../.power/schemas/appschemas/dataSourcesInfo';
 import { getClient } from '@microsoft/power-apps/data';
 
-export class Retrieve_SQL_DataService {
-  private static readonly dataSourceName = 'retrieve_sql_data';
+export class Retrieve_SQL_Data_ProjectsService {
+  private static readonly dataSourceName = 'retrieve_sql_data_projects';
 
   private static readonly client = getClient(dataSourcesInfo);
 
   public static async Run(input: ManualTriggerInput): Promise<IOperationResult<ResponseActionOutput>> {
     const params: { input: ManualTriggerInput } = { input };
     const allParams = { ...params, "api-version": "2015-02-01-preview" };
-    const result = await Retrieve_SQL_DataService.client.executeAsync<{ input: ManualTriggerInput }, ResponseActionOutput>(
+    const result = await Retrieve_SQL_Data_ProjectsService.client.executeAsync<{ input: ManualTriggerInput }, ResponseActionOutput>(
       {
         connectorOperation: {
-          tableName: Retrieve_SQL_DataService.dataSourceName,
+          tableName: Retrieve_SQL_Data_ProjectsService.dataSourceName,
           operationName: 'Run',
           parameters: allParams
         },

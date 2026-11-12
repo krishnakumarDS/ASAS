@@ -8,7 +8,7 @@
     "swagger": {
       "swagger": "2.0",
       "info": {
-        "title": "ASAS_GetFile",
+        "title": "ASAS_GetFiles",
         "version": "2015-02-01-preview"
       },
       "host": "uae-001.azure-apihub.net",

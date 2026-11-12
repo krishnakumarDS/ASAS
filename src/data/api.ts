@@ -1,7 +1,7 @@
 // Calls the Retrieve_SQL_Data flow (Power Apps trigger -> sp_UC000420_Api) and returns the SQL result sets.
 // The flow's two inputs are named text (Action) and text_1 (Inputs: the JSON) by the generated service.
 import { useSyncExternalStore } from 'react'
-import { Retrieve_SQL_DataService } from '../generated'
+import { Retrieve_SQL_Data_ProjectsService } from '../generated'
 
 export type Row = Record<string, unknown>
 
@@ -38,7 +38,7 @@ export async function callApi(action: string, params: Record<string, unknown> = 
 }
 
 async function callApiNow(action: string, params: Record<string, unknown>): Promise<Row[][]> {
-  const r = await Retrieve_SQL_DataService.Run({ text: action, text_1: JSON.stringify(params) })
+  const r = await Retrieve_SQL_Data_ProjectsService.Run({ text: action, text_1: JSON.stringify(params) })
   if (!r.success) throw new Error(r.error?.message ?? `The flow call failed (${action}).`)
   const raw = r.data?.output
   if (!raw) throw new Error(`The flow returned no data (${action}).`)
