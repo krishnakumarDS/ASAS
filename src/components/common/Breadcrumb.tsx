@@ -11,7 +11,7 @@ export default function Breadcrumb() {
     <nav aria-label="Breadcrumb" className="row" style={{ gap: 4, fontSize: 12, marginBottom: 6, flexWrap: 'wrap' }}>
       <Link to="/" className="muted">Dashboard</Link>
       {crumbs.map((c, i) => (
-        <span key={c.to} className="row" style={{ gap: 4 }}>
+        <span key={`${i}-${c.to}`} className="row" style={{ gap: 4 }}>
           <ChevronRight size={12} className="faint" />
           {i === crumbs.length - 1 ? <span style={{ fontWeight: 600 }} aria-current="page">{c.label}</span> : <Link to={c.to} className="muted">{c.label}</Link>}
         </span>
